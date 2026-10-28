@@ -113,9 +113,9 @@ func (w writer) writeAccessor() {
 func (w writer) writeString() {
 	x := w.f.Scope().Name("x")
 
-	value := w.f.Import("fmt", "fmt") + ".Sprint(" + x + "." + w.field.Name + ")"
-	if w.hasString {
-		value = x + "." + w.field.Name + ".String()"
+	value := x + "." + w.field.Name + ".String()"
+	if !w.hasString {
+		value = w.f.Import("fmt", "fmt") + ".Sprint(" + x + "." + w.field.Name + ")"
 	}
 	w.doc(fmt.Sprintf("String formats the %s that %s holds as fmt's %%v does.", w.desc, x))
 	fmt.Fprintf(w.f, "func (%s %s) String() string {\n", x, w.Name)

@@ -76,3 +76,27 @@ func (Tags) validate(tags) error { return nil }
 		}
 	}
 }
+
+// A value with a String method of its own is formatted by it, and so the file
+// imports fmt only for a value without one.
+func TestEmit_ImportsFmtOnlyToFormat(t *testing.T) {
+	t.Parallel()
+
+	pkg := pkgtest.Load(t, map[string]string{"test.go": `package test
+
+import "time"
+
+//kanna:value
+type CompletedAt struct{ t time.Time }
+
+func (CompletedAt) validate(time.Time) error { return nil }
+`})
+
+	got, err := gen.Emit(pkg.Fset, []*packages.Package{pkg}, nil)
+	if err != nil {
+		t.Fatalf("emit: %v\n%s", err, got)
+	}
+	if strings.Contains(string(got), `"fmt"`) {
+		t.Errorf("output imports fmt, which it does not use:\n%s", got)
+	}
+}
