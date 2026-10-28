@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-kanna/internal/cli"
 	"github.com/go-kanna/internal/packages"
+	"github.com/go-kanna/internal/valuetype"
 
 	"github.com/go-kanna/value/internal/gen"
 )
@@ -121,10 +122,16 @@ func TestCommand_Generates(t *testing.T) {
 		}
 	}
 
-	// The output compiles along with the package it is generated into.
+	// The output compiles along with the package it is generated into, and
+	// the generators reading its types know each for a value type.
 	set, err := packages.Load([]string{"./..."}, packages.Config{Dir: dir})
 	if err != nil || len(set.Diags) > 0 {
-		t.Errorf("generated package does not load: %v %v", err, set.Diags)
+		t.Fatalf("generated package does not load: %v %v", err, set.Diags)
+	}
+	for _, name := range []string{"Email", "CompletedAt"} {
+		if v, ok := valuetype.Of(set.Packages[0].Types.Scope().Lookup(name).Type()); !ok || v.Constructor == nil {
+			t.Errorf("valuetype.Of(%s) = %+v, %t; want a value type with its constructor", name, v, ok)
+		}
 	}
 
 	code, stdout, stderr = run(t, dir, "-check", "-v")
