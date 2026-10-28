@@ -95,6 +95,11 @@ $ go generate ./...
   did you mean "//kanna:value"?
 ```
 
+Code may call what is generated before it exists, as when a type moves to kanna-value or its callers are written
+first. Errors saying only that a constructor or a method the run generates is missing do not stop it; any other does.
+Another package whose generator reads the value type, such as a kanna-mapper package, needs its `value_gen.go` to exist,
+so on that first run, generate the value type's package before it.
+
 ## What is generated
 
 For a struct `X` holding a value of type `T` in its field `t`:
