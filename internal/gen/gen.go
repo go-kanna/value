@@ -5,6 +5,7 @@ import (
 	"go/token"
 	"maps"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -40,6 +41,7 @@ func run(dir string, cfg config, patterns []string) ([]output.Change, []diag.Dia
 	if err != nil {
 		return nil, []diag.Diag{diag.Errorf(token.Position{}, "%v", err)}
 	}
+	set.Diags = slices.DeleteFunc(set.Diags, pending(set))
 	if diag.HasErrors(set.Diags) {
 		stop := set.Diags
 		for _, path := range set.SetAside {
@@ -65,6 +67,39 @@ func run(dir string, cfg config, patterns []string) ([]output.Change, []diag.Dia
 			"no struct is marked //kanna:%s in %s", directiveKey, strings.Join(in, ", ")))
 	}
 	return changes, append(set.Diags, diags...)
+}
+
+// The messages go/types reports a missing name with: a package-level one, and
+// a field or method of a type.
+var (
+	undefinedName = regexp.MustCompile(`^undefined: (\w+)$`)
+	missingMethod = regexp.MustCompile(`\(type \*?(\w+) has no field or method (\w+)\)$`)
+)
+
+// pending returns whether an error loading set only says that something the
+// run is about to generate is missing: a constructor or a method of one of its
+// value types, which hand-written code or another generator's output already
+// calls. The output makes it go away, so it must not stop the run writing the
+// output, as it would on the first run over a package already using its value
+// types.
+func pending(set packages.Set) func(diag.Diag) bool {
+	found, _ := targets(set.Fset, scan.Structs(set.Packages))
+	funcs := make(map[string]bool)
+	methods := make(map[string][]string)
+	for _, t := range found {
+		funcs[t.newFunc], funcs[t.mustFunc] = true, true
+		methods[t.Name] = append(generatedMethods(t.field.Type), t.accessor)
+	}
+
+	return func(d diag.Diag) bool {
+		if m := undefinedName.FindStringSubmatch(d.Message); m != nil {
+			return funcs[m[1]]
+		}
+		if m := missingMethod.FindStringSubmatch(d.Message); m != nil {
+			return slices.Contains(methods[m[1]], m[2])
+		}
+		return false
+	}
 }
 
 // generate works out the changes for the packages of set: the output of each
