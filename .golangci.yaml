@@ -28,9 +28,13 @@ linters:
       os-mkdir-temp: true
       os-setenv: true
       os-chdir: true
+    tagliatelle:
+      case:
+        rules:
+          json: snake # As the rest of the kanna family spells JSON.
     wrapcheck:
-      extra-ignore-sigs:
-        - ) *github.com/go-kanna/value/rule.Error # makes the error rather than passing one on
+      ignore-package-globs:
+        - github.com/go-kanna/value/rule # Its errors are a rule's verdict, returned as they are.
   enable:
     - gomodguard_v2
   disable:
