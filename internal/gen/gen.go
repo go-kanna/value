@@ -5,7 +5,6 @@ import (
 	"go/token"
 	"maps"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -41,18 +40,24 @@ func run(dir string, cfg config, patterns []string) ([]output.Change, []diag.Dia
 	if err != nil {
 		return nil, []diag.Diag{diag.Errorf(token.Position{}, "%v", err)}
 	}
-	set.Diags = slices.DeleteFunc(set.Diags, pending(set))
-	if diag.HasErrors(set.Diags) {
-		stop := set.Diags
-		for _, path := range set.SetAside {
-			stop = append(stop, diag.Warningf(token.Position{Filename: path},
-				"set aside because it no longer compiles; it is regenerated once the errors above are fixed"))
-		}
-		return nil, stop
+	// Code calling a constructor or a method of a value type does not compile
+	// before the run writes it, nor does code calling it as the run is about to
+	// change it. So a type error of a package loaded does not stop the run
+	// here: packages.Recheck tells, once the output is in place, whether it
+	// remains.
+	blocking, deferred := set.Split()
+	if diag.HasErrors(blocking) {
+		return nil, append(blocking, set.SetAsideWarnings()...)
 	}
 
 	changes, diags := generate(set)
-	if !diag.HasErrors(diags) && !slices.ContainsFunc(changes, func(c output.Change) bool { return !c.Remove }) {
+	if diag.HasErrors(diags) {
+		return nil, packages.Stopped(deferred, diags, set.Pending(written(set)))
+	}
+	if rds := packages.Recheck(set, changes); len(rds) > 0 {
+		return nil, slices.Concat(diags, rds, set.SetAsideWarnings())
+	}
+	if !slices.ContainsFunc(changes, func(c output.Change) bool { return !c.Remove }) {
 		// Nothing to stop for: a go:generate line left behind does no harm. The
 		// packages are named by path, as go generate ./... runs every one of
 		// them in a "." of its own.
@@ -66,40 +71,21 @@ func run(dir string, cfg config, patterns []string) ([]output.Change, []diag.Dia
 		diags = append(diags, diag.Warningf(token.Position{},
 			"no struct is marked //kanna:%s in %s", directiveKey, strings.Join(in, ", ")))
 	}
-	return changes, append(set.Diags, diags...)
+	return changes, diags
 }
 
-// The messages go/types reports a missing name with: a package-level one, and
-// a field or method of a type.
-var (
-	undefinedName = regexp.MustCompile(`^undefined: (\w+)$`)
-	missingMethod = regexp.MustCompile(`\(type \*?(\w+) has no field or method (\w+)\)$`)
-)
-
-// pending returns whether an error loading set only says that something the
-// run is about to generate is missing: a constructor or a method of one of its
-// value types, which hand-written code or another generator's output already
-// calls. The output makes it go away, so it must not stop the run writing the
-// output, as it would on the first run over a package already using its value
-// types.
-func pending(set packages.Set) func(diag.Diag) bool {
+// written returns what the run writes for the value types of set, by full
+// name: their constructors, and their methods.
+func written(set packages.Set) map[string]bool {
 	found, _ := targets(set.Fset, scan.Structs(set.Packages))
-	funcs := make(map[string]bool)
-	methods := make(map[string][]string)
+	names := make(map[string]bool)
 	for _, t := range found {
-		funcs[t.newFunc], funcs[t.mustFunc] = true, true
-		methods[t.Name] = append(generatedMethods(t.field.Type), t.accessor)
-	}
-
-	return func(d diag.Diag) bool {
-		if m := undefinedName.FindStringSubmatch(d.Message); m != nil {
-			return funcs[m[1]]
+		names[t.PkgPath+"."+t.newFunc], names[t.PkgPath+"."+t.mustFunc] = true, true
+		for _, m := range append(generatedMethods(t.field.Type), t.accessor) {
+			names[t.PkgPath+"."+t.Name+"."+m] = true
 		}
-		if m := missingMethod.FindStringSubmatch(d.Message); m != nil {
-			return slices.Contains(methods[m[1]], m[2])
-		}
-		return false
 	}
+	return names
 }
 
 // generate works out the changes for the packages of set: the output of each
