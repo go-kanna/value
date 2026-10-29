@@ -96,7 +96,9 @@ $ go generate ./...
 ```
 
 Code may call what is generated before it exists, as when a type moves to kanna-value or its callers are written
-first. Errors saying only that a constructor or a method the run generates is missing do not stop it; any other does.
+first. kanna-value type-checks the packages it loads once more with what it is about to write in place, and writes
+nothing while their code does not compile with it: a mistake the missing constructor hid is reported then, such as a
+method that the value type does not have.
 Another package whose generator reads the value type, such as a kanna-mapper package, needs its `value_gen.go` to exist,
 so on that first run, generate the value type's package before it.
 
@@ -223,8 +225,8 @@ $ go generate ./...
 warning: no struct is marked //kanna:value in example.com/app/model
 ```
 
-A package whose structs have all lost `//kanna:value` has its `value_gen.go` removed; a file of that name without the
-generated-code header is never touched.
+A package whose structs have all lost `//kanna:value` has its `value_gen.go` removed, unless code in the packages the
+run loads still calls what it declares; a file of that name without the generated-code header is never touched.
 
 ## Example
 

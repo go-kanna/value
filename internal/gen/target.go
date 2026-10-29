@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-kanna/internal/diag"
 	"github.com/go-kanna/internal/directive"
+	"github.com/go-kanna/internal/packages"
 	"github.com/go-kanna/internal/scan"
 	"github.com/go-kanna/internal/valuetype"
 )
@@ -104,6 +105,9 @@ func check(fset *token.FileSet, s scan.Struct, d directive.Directive) (target, [
 	f, ds := valueField(s)
 	if diags = append(diags, ds...); len(ds) > 0 {
 		return target{}, diags
+	}
+	if packages.Invalid(f.Type) {
+		return target{}, append(diags, packages.NotTypeChecked(f.Pos))
 	}
 	t := target{Struct: s, field: f}
 
