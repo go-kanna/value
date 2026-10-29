@@ -10,6 +10,7 @@ import (
 	"github.com/go-kanna/internal/diag"
 	"github.com/go-kanna/internal/directive"
 	"github.com/go-kanna/internal/scan"
+	"github.com/go-kanna/internal/valuetype"
 )
 
 // directiveKey spells the directive //kanna:value.
@@ -121,7 +122,7 @@ func check(fset *token.FileSet, s scan.Struct, d directive.Directive) (target, [
 		t.clone = "maps"
 	}
 
-	t.newFunc, t.mustFunc = constructors(s.Name)
+	t.newFunc, t.mustFunc = valuetype.Constructors(s.Name)
 	diags = append(diags, checkRule(fset, s, f.Type)...)
 	diags = append(diags, checkMethods(fset, t)...)
 	diags = append(diags, checkFuncs(fset, t)...)
@@ -156,24 +157,18 @@ func valueField(s scan.Struct) (scan.Field, []diag.Diag) {
 // accessorOf names the method returning the value of f after its type, and
 // says why it cannot be named so.
 func accessorOf(s scan.Struct, f scan.Field) (string, []diag.Diag) {
-	var name string
-	switch t := types.Unalias(f.Type).(type) {
-	case *types.Basic:
-		name = t.Name()
-	case *types.Named:
-		if types.IsInterface(t) {
-			return "", []diag.Diag{diag.Errorf(f.Pos,
-				"%s holds an interface, %s, whose dynamic value no rule can be written for",
-				s.Name, typeString(s, f.Type))}
-		}
-		name = t.Obj().Name()
-	default:
+	if _, named := types.Unalias(f.Type).(*types.Named); named && types.IsInterface(f.Type) {
+		return "", []diag.Diag{diag.Errorf(f.Pos,
+			"%s holds an interface, %s, whose dynamic value no rule can be written for",
+			s.Name, typeString(s, f.Type))}
+	}
+	name, ok := valuetype.Accessor(f.Type)
+	if !ok {
 		return "", []diag.Diag{diag.Errorf(f.Pos,
 			"%s holds a %s, which has no name to call the method returning it after",
 			s.Name, typeString(s, f.Type)).
 			WithHints("declare a named type for it, and hold that")}
 	}
-	name = strings.ToUpper(name[:1]) + name[1:]
 
 	if slices.Contains(generatedMethods(f.Type), name) {
 		return "", []diag.Diag{diag.Errorf(f.Pos,
@@ -232,15 +227,6 @@ func hasMethod(t types.Type, name string, param, result types.Type) bool {
 		return sig.Params().Len() == 0
 	}
 	return sig.Params().Len() == 1 && types.Identical(sig.Params().At(0).Type(), param)
-}
-
-// constructors names the constructors of the struct name, exported as it is.
-func constructors(name string) (string, string) {
-	if token.IsExported(name) {
-		return "New" + name, "Must" + name
-	}
-	upper := strings.ToUpper(name[:1]) + name[1:]
-	return "new" + upper, "must" + upper
 }
 
 // checkRule says why s has no validate method that the generated code can
