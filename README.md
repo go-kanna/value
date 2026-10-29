@@ -228,7 +228,8 @@ warning: no struct is marked //kanna:value in example.com/app/model
 A package whose structs have all lost `//kanna:value` has its `value_gen.go` removed, unless code in the packages the
 run loads still calls what it declares; a file of that name without the generated-code header is never touched. The
 `go generate` that removes it ends with `open ...: no such file or directory`, from go generate itself, which lists a
-package's files before it runs the generators; the file is gone as it should be.
+package's files before it runs the generators; the file is gone as it should be
+([golang/go#36068](https://github.com/golang/go/issues/36068)).
 
 ## Example
 
