@@ -5,7 +5,8 @@ import (
 	"go/types"
 	"path/filepath"
 	"slices"
-	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/go-kanna/internal/diag"
 	"github.com/go-kanna/internal/directive"
@@ -151,7 +152,7 @@ func valueField(s scan.Struct) (scan.Field, []diag.Diag) {
 	case f.Exported:
 		return f, []diag.Diag{diag.Errorf(f.Pos,
 			"%s.%s must be unexported, so that a value is set only through the generated code", s.Name, f.Name).
-			WithHints("rename it to " + strings.ToLower(f.Name[:1]) + f.Name[1:])}
+			WithHints("rename it to " + lowerFirst(f.Name))}
 	case f.Name == "_":
 		return f, []diag.Diag{diag.Errorf(f.Pos,
 			"the field of %s needs a name for the generated code to refer to it by", s.Name)}
@@ -286,6 +287,12 @@ func checkFuncs(fset *token.FileSet, named *types.Named, funcs []string, key, as
 		}
 	}
 	return diags
+}
+
+// lowerFirst lowers the first letter of s, which may take more than one byte.
+func lowerFirst(s string) string {
+	r, size := utf8.DecodeRuneInString(s)
+	return string(unicode.ToLower(r)) + s[size:]
 }
 
 // typeString spells t as the package of s refers to it.

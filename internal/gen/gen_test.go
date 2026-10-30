@@ -159,6 +159,36 @@ func TestCommand_Generates(t *testing.T) {
 	}
 }
 
+// A type named in Unicode gets names that parse, its first letter capitalized
+// whole rather than cut through.
+func TestCommand_GeneratesUnicodeNames(t *testing.T) {
+	t.Parallel()
+
+	dir := writeModule(t, map[string]string{"app.go": `package app
+
+//kanna:value
+type éclair struct{ s string }
+
+func (éclair) validate(string) error { return nil }
+
+//kanna:enum
+type état string
+
+const étatOuvert état = "ouvert"
+
+var (
+	_, _ = newÉclair("a")
+	_, _ = newÉtat("ouvert")
+	_    = étatValues()
+)
+`})
+
+	if code, stdout, stderr := run(t, dir); code != cli.ExitOK || stdout != "" || stderr != "" {
+		t.Fatalf("run = %d, stdout %q, stderr %q; want success in silence", code, stdout, stderr)
+	}
+	compiles(t, dir)
+}
+
 // The first run over a package that already calls what it generates, by hand
 // or from another generator's output, finds the package not compiling for
 // want of that very output, which must not stop it.

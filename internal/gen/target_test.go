@@ -90,6 +90,14 @@ func (Address) validate(address) error { return nil }
 // IsZero is free to declare, as none is generated for an address.
 func (a Address) IsZero() bool { return len(a.a.lines) == 0 }
 
+// éclair starts with a letter of two bytes, which its constructors
+// capitalize whole.
+//
+//kanna:value
+type éclair struct{ n int }
+
+func (éclair) validate(int) error { return nil }
+
 //kanna:value
 type Regenerated struct{ n int }
 
@@ -119,6 +127,7 @@ func (x Regenerated) String() string { return "" }
 		"Tags{t tags} Tags() zero=nil clone=slices NewTags/MustTags",
 		"Labels{l labels} Labels() zero=nil clone=maps NewLabels/MustLabels",
 		"Address{a address} Address() zero=none NewAddress/MustAddress",
+		"éclair{n int} Int() zero=compare newÉclair/mustÉclair",
 		"Regenerated{n int} Int() zero=compare NewRegenerated/MustRegenerated",
 	}
 	if !slices.Equal(names, want) {
@@ -193,6 +202,15 @@ type ID struct{ Value string }
 `,
 			want: "test.go:4:17: error: ID.Value must be unexported, so that a value is set only through the generated code\n" +
 				"  rename it to value",
+		},
+		{
+			name: "exported field starting with a letter of two bytes",
+			src: `package test
+
+//kanna:value
+type Pastry struct{ Éclair string }
+`,
+			want: "  rename it to éclair",
 		},
 		{
 			name: "embedded field",
