@@ -130,6 +130,9 @@ A few things follow from what `T` is:
 - `IsZero` tells the zero value as Go does: a nil slice is zero, an empty one is not. A `T` that neither `==` nor
   `== nil` nor a method of its own can tell zero, such as a struct holding a slice, gets no `IsZero`; encoding/json's
   `omitzero` falls back on reflection for it.
+- A zero given is the zero never given: when the rule accepts the zero value, as a price of 0, `MustPrice(0)` equals
+  `Price{}`, `IsZero` reports both, `omitzero` leaves both out, and kanna-validate's `required` reports both `blank`.
+  Where a value of zero and no value at all mean different things, hold a `*Price`, nil when none was given.
 - `Equal` exists because `==` can be wrong for a time: two of the same instant differ when one carries a monotonic
   clock reading or another location, as a time read back from a database does.
 
@@ -219,6 +222,17 @@ The code names the broken rule in a form stable enough to key a translated messa
 carry what the message needs. kanna-validate reports the codes of Rails' ActiveModel::Validations, such as `too_long`
 with a `count`; using them for your own rules keeps an API's errors alike. An error formats as `rule: too_long
 (count=3)`. The rejected value is never part of it: errors end up in logs, and the value may be personal data.
+
+## Changing a rule
+
+`Scan` holds a row to the rule as it is now, as `UnmarshalJSON` holds a request, so a rule made stricter changes what
+the rows already stored can be read as: a row the old rule accepted and the new one rejects fails to scan, and a query
+listing it fails with it. Before such a change goes out, find the rows it would reject, mend or move them, and then
+deploy the stricter rule. An enum losing a constant is the same change. One gaining a constant is too, the other way
+round: a release rolled back after rows took the new value cannot read them.
+
+That such a row fails rather than being read as it is follows from what a value type is: a value from outside the
+package, a database included, is always one its rule accepts.
 
 ## With kanna-validate
 
