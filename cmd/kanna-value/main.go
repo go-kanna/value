@@ -1,5 +1,5 @@
 // Command kanna-value generates value types from structs marked
-// //kanna:value.
+// //kanna:value, and enums from string types marked //kanna:enum.
 package main
 
 import (

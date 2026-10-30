@@ -60,6 +60,22 @@ func label(e Email) string       { return show(e) }
 			},
 		},
 		{
+			name: "an enum",
+			files: map[string]string{
+				"status.go": "package app\n\n//kanna:enum\ntype Status string\n\nconst StatusOpen Status = \"open\"\n",
+				"use.go": `package app
+
+import "encoding"
+
+var _ encoding.TextUnmarshaler = (*Status)(nil)
+
+func parse(s string) (Status, error) { return NewStatus(s) }
+
+func statuses() []Status { return StatusValues() }
+`,
+			},
+		},
+		{
 			name: "another package",
 			files: map[string]string{
 				"app.go":         "package app\n",

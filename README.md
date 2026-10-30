@@ -7,7 +7,8 @@
 [![Release](https://img.shields.io/github/v/tag/go-kanna/value?label=release&sort=semver)](https://github.com/go-kanna/value/tags)
 
 kanna-value turns a struct holding one value and a `validate` method into a value type — constructors, an accessor,
-and JSON and SQL methods — that holds only what its rule accepts, wherever the value comes from.
+and JSON and SQL methods — that holds only what its rule accepts, wherever the value comes from. It also turns a string
+type with constants into an enum that reads from outside only the values of its constants.
 
 Part of the [kanna](https://github.com/go-kanna/kanna) family of code generators. Requires Go 1.26.
 
@@ -138,6 +139,56 @@ column that may be NULL into a `*X`, which database/sql sets to nil.
 A method or a constructor you have written under one of the generated names stops generation instead of being
 overwritten. `Equal` and `IsZero` are yours to write when none is generated.
 
+## Enums
+
+Mark a string type whose values are the constants declared beside it with `//kanna:enum`:
+
+```go
+//kanna:enum
+type OrderStatus string
+
+const (
+	OrderStatusPlaced   OrderStatus = "placed"
+	OrderStatusPaid     OrderStatus = "paid"
+	OrderStatusShipped  OrderStatus = "shipped"
+	OrderStatusCanceled OrderStatus = "canceled"
+)
+```
+
+`go generate ./...` adds to `value_gen.go`:
+
+```go
+func NewOrderStatus(v string) (OrderStatus, error)    // OrderStatus(v), if it is the value of a constant
+func OrderStatusValues() []OrderStatus                 // the constants in the order they are declared, in a new slice
+func (x *OrderStatus) UnmarshalText(text []byte) error // what encoding/json decodes a string or an object key with
+func (x *OrderStatus) Scan(src any) error
+```
+
+Each of them rejects a value that is none of the constants with `rule.Fail("inclusion")`, the code kanna-validate's
+`oneof` reports too, and leaves the value as it was. A NULL column is an error, as for a value type.
+
+The type stays a string type with constants, so a `switch` over them, linters checking that a switch is exhaustive, and
+other generators reading the constants work as before. Nothing is generated to encode a value, as encoding/json and
+database/sql already send it as the string it is. What the generated code checks is what comes from outside: within the
+program, `OrderStatus("shiped")` compiles as for any string type, so make values with the constants or with
+`NewOrderStatus`.
+
+An enum that cannot be generated stops generation:
+
+```console
+$ go generate ./...
+./order.go:5:6: error: OrderStatus has no constants to be one of
+  declare them beside it, such as const OrderStatusA OrderStatus = "a"
+./order.go:12:2: error: OrderStatusSettled holds "paid", as OrderStatusPaid does
+  give each constant a value of its own
+./order.go:13:2: error: OrderStatusNone holds "", the zero value of OrderStatus, which stands for none
+  remove it, and use a *OrderStatus where a value may be absent
+./order.go:20:6: error: Kind is not a struct, which //kanna:value marks
+  mark it //kanna:enum to accept only the constants declared beside it
+```
+
+An unexported enum gets unexported functions, `newX` and `xValues`.
+
 ## Rules
 
 A `validate` method returns nil to accept a value, and an error to reject it. The package `rule` provides what rules are
@@ -189,6 +240,9 @@ goes on decoding, so the response lists it together with whatever the tags find:
 {"errors": {"email": [{"error": "email"}], "name": [{"error": "blank"}]}}
 ```
 
+An enum needs no `oneof` either: a status that `UnmarshalText` rejects is recorded as
+`{"errors": {"status": [{"error": "inclusion"}]}}`.
+
 ## Linting
 
 wrapcheck reports `return rule.Email(s)` in a `validate` method as an unwrapped error from another package. The error
@@ -216,16 +270,16 @@ kanna-value [flags] [packages]
 | `-version`      | print the version                                                                            |
 
 The packages default to the one in the current directory, so `//go:generate go tool kanna-value` needs no argument. A
-run that succeeds prints nothing but its warnings. One of them is about the run itself: when no struct in its packages
-is marked `//kanna:value`, it succeeds, since a `//go:generate` line left behind does no harm, but says so, since the
-line was most likely meant to go as well:
+run that succeeds prints nothing but its warnings. One of them is about the run itself: when nothing in its packages is
+marked `//kanna:value` or `//kanna:enum`, it succeeds, since a `//go:generate` line left behind does no harm, but says
+so, since the line was most likely meant to go as well:
 
 ```console
 $ go generate ./...
-warning: no struct is marked //kanna:value in example.com/app/model
+warning: nothing is marked //kanna:value or //kanna:enum in example.com/app/model
 ```
 
-A package whose structs have all lost `//kanna:value` has its `value_gen.go` removed, unless code in the packages the
+A package whose types have all lost their directive has its `value_gen.go` removed, unless code in the packages the
 run loads still calls what it declares; a file of that name without the generated-code header is never touched. The
 `go generate` that removes it ends with `open ...: no such file or directory`, from go generate itself, which lists a
 package's files before it runs the generators; the file is gone as it should be
@@ -234,8 +288,9 @@ package's files before it runs the generators; the file is gone as it should be
 ## Example
 
 [`example`](example) builds the values of a task service from constants and from input, decodes requests holding them
-— one valid, one with too many tags, one completed before the service began — and shows that a slice it was given cannot
-be changed from outside. CI regenerates it and fails if the output would change.
+— one valid, one with too many tags, one completed before the service began, one with a priority that is none of its
+enum's constants — and shows that a slice it was given cannot be changed from outside. CI regenerates it and fails if the
+output would change.
 
 ## Development
 

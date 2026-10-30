@@ -1,6 +1,7 @@
 // Command example builds and decodes the values of a task service, showing
 // what kanna-value generates: constructors and JSON methods that let in only
-// what each value's validate method accepts.
+// what each value's validate method accepts, and only the constants of an
+// enum.
 //
 // Regenerate with:
 //
@@ -26,8 +27,11 @@ func main() {
 
 	// Input may not be, so New says why it is rejected.
 	if _, err := model.NewEmail("Kanna <kanna@example.com>"); err != nil {
-		fmt.Fprintf(os.Stdout, "rejected: %v\n\n", err)
+		fmt.Fprintf(os.Stdout, "rejected: %v\n", err)
 	}
+
+	// An enum lists its constants, as a form offering them would.
+	fmt.Fprintf(os.Stdout, "priorities: %v\n\n", model.PriorityValues())
 
 	bodies := []struct {
 		title string
@@ -35,15 +39,20 @@ func main() {
 	}{
 		{
 			title: "A valid request",
-			body:  `{"title":"Write docs","owner":"kanna@example.com","tags":["docs"],"completed_at":"2026-10-29T09:00:00Z"}`,
+			body: `{"title":"Write docs","owner":"kanna@example.com","priority":"high","tags":["docs"],` +
+				`"completed_at":"2026-10-29T09:00:00Z"}`,
 		},
 		{
 			title: "Too many tags",
-			body:  `{"title":"Ship it","owner":"kanna@example.com","tags":["a","b","c","d"]}`,
+			body:  `{"title":"Ship it","owner":"kanna@example.com","priority":"low","tags":["a","b","c","d"]}`,
 		},
 		{
 			title: "Completed before the service began",
-			body:  `{"title":"Ship it","owner":"kanna@example.com","completed_at":"1999-12-31T00:00:00Z"}`,
+			body:  `{"title":"Ship it","owner":"kanna@example.com","priority":"low","completed_at":"1999-12-31T00:00:00Z"}`,
+		},
+		{
+			title: "A priority that is none of the constants",
+			body:  `{"title":"Ship it","owner":"kanna@example.com","priority":"urgent"}`,
 		},
 	}
 	for _, b := range bodies {
@@ -60,8 +69,8 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		fmt.Fprintf(os.Stdout, "%q by %s, tagged %v, completed at %v\n\n",
-			task.Title, task.Owner, task.Tags, task.CompletedAt)
+		fmt.Fprintf(os.Stdout, "%q by %s, %s priority, tagged %v, completed at %v\n\n",
+			task.Title, task.Owner, task.Priority, task.Tags, task.CompletedAt)
 	}
 
 	// Tags holds a copy, so changing the slice it was built from changes
