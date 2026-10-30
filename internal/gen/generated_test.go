@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -246,6 +247,126 @@ func TestGenerated_SQL(t *testing.T) {
 			}
 			if !at.Time().Equal(valid) {
 				t.Errorf("Scan(%v) left %v, want it left as %v", tt.src, at, valid)
+			}
+		})
+	}
+}
+
+func TestGenerated_EnumNew(t *testing.T) {
+	t.Parallel()
+
+	if got, err := emit.NewStatus("paid"); err != nil || got != emit.StatusPaid {
+		t.Errorf(`NewStatus("paid") = %q, %v; want StatusPaid`, got, err)
+	}
+	for _, v := range []string{"", "Paid", "refunded"} {
+		got, err := emit.NewStatus(v)
+		wantCode(t, err, "inclusion")
+		if got != "" {
+			t.Errorf("NewStatus(%q) = %q, want the zero Status", v, got)
+		}
+	}
+}
+
+func TestGenerated_EnumValues(t *testing.T) {
+	t.Parallel()
+
+	values := emit.StatusValues()
+	if want := []emit.Status{emit.StatusPlaced, emit.StatusPaid, emit.StatusShipped}; !slices.Equal(values, want) {
+		t.Errorf("StatusValues() = %q, want %q", values, want)
+	}
+	values[0] = "changed by a caller"
+	if got := emit.StatusValues()[0]; got != emit.StatusPlaced {
+		t.Errorf("StatusValues()[0] = %q after a caller changed its slice, want %q", got, emit.StatusPlaced)
+	}
+}
+
+// order holds an enum as a request body would.
+type order struct {
+	Status   emit.Status         `json:"status"`
+	Previous *emit.Status        `json:"previous"`
+	Counts   map[emit.Status]int `json:"counts"`
+}
+
+func TestGenerated_EnumJSON(t *testing.T) {
+	t.Parallel()
+
+	paid := emit.StatusPaid
+	b, err := json.Marshal(order{Status: emit.StatusShipped, Previous: &paid, Counts: map[emit.Status]int{paid: 1}})
+	if want := `{"status":"shipped","previous":"paid","counts":{"paid":1}}`; err != nil || string(b) != want {
+		t.Errorf("Marshal = %s, %v; want %s", b, err, want)
+	}
+
+	var got order
+	if err := json.Unmarshal(b, &got); err != nil || got.Status != emit.StatusShipped ||
+		got.Previous == nil || *got.Previous != paid || got.Counts[paid] != 1 {
+		t.Errorf("Unmarshal(%s) = %+v, %v; want the values back", b, got, err)
+	}
+
+	tests := []struct {
+		name string
+		body string
+		code string // of the rule's error, or "" for encoding/json's own
+	}{
+		{name: "not a constant", body: `{"status":"refunded"}`, code: "inclusion"},
+		{name: "not a constant, through a pointer", body: `{"previous":"refunded"}`, code: "inclusion"},
+		{name: "not a constant, as a key", body: `{"counts":{"refunded":1}}`, code: "inclusion"},
+		{name: "not a string", body: `{"status":1}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := order{Status: emit.StatusPlaced}
+			err := json.Unmarshal([]byte(tt.body), &got)
+			if tt.code != "" {
+				wantCode(t, err, tt.code)
+			} else if _, ok := errors.AsType[*json.UnmarshalTypeError](err); !ok {
+				t.Errorf("err = %v, want encoding/json's *UnmarshalTypeError", err)
+			}
+			if got.Status != emit.StatusPlaced {
+				t.Errorf("Status = %q after an error, want it left as %q", got.Status, emit.StatusPlaced)
+			}
+		})
+	}
+
+	got = order{Status: emit.StatusPlaced}
+	if err := json.Unmarshal([]byte(`{"status":null}`), &got); err != nil || got.Status != emit.StatusPlaced {
+		t.Errorf("Unmarshal of null = %v, leaving %q; want nil, leaving it as it was", err, got.Status)
+	}
+}
+
+func TestGenerated_EnumScan(t *testing.T) {
+	t.Parallel()
+
+	for _, src := range []any{"paid", []byte("paid")} {
+		var s emit.Status
+		if err := s.Scan(src); err != nil || s != emit.StatusPaid {
+			t.Errorf("Scan(%#v) = %v, leaving %q; want StatusPaid", src, err, s)
+		}
+	}
+
+	tests := []struct {
+		name string
+		src  any
+		want string // the error's text, or its code for a rule's
+	}{
+		{name: "not a constant", src: "refunded", want: "inclusion"},
+		{name: "NULL", src: nil, want: "emit: cannot scan NULL into Status; scan a column that may be NULL into *Status"},
+		{name: "nothing a string is scanned from", src: struct{}{}, want: "unsupported Scan"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			s := emit.StatusPlaced
+			err := s.Scan(tt.src)
+			if _, ok := errors.AsType[*rule.Error](err); ok {
+				wantCode(t, err, tt.want)
+			} else if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("Scan(%v) = %v, want an error containing %q", tt.src, err, tt.want)
+			}
+			if s != emit.StatusPlaced {
+				t.Errorf("Scan(%v) left %q, want it left as %q", tt.src, s, emit.StatusPlaced)
 			}
 		})
 	}

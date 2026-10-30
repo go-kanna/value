@@ -128,8 +128,9 @@ func check(fset *token.FileSet, s scan.Struct, d directive.Directive) (target, [
 
 	t.newFunc, t.mustFunc = valuetype.Constructors(s.Name)
 	diags = append(diags, checkRule(fset, s, f.Type)...)
-	diags = append(diags, checkMethods(fset, t)...)
-	diags = append(diags, checkFuncs(fset, t)...)
+	diags = append(diags, checkMethods(fset, s.Named, append(generatedMethods(f.Type), t.accessor), directiveKey)...)
+	diags = append(diags, checkFuncs(fset, s.Named, []string{t.newFunc, t.mustFunc}, directiveKey,
+		"as a constructor of "+s.Name)...)
 	return t, diags
 }
 
@@ -254,33 +255,34 @@ func checkRule(fset *token.FileSet, s scan.Struct, v types.Type) []diag.Diag {
 		WithHints("add " + want + ", returning nil to accept the value")}
 }
 
-// checkMethods says which methods of t the generated ones would collide with.
-// The ones an earlier run generated are about to be replaced.
-func checkMethods(fset *token.FileSet, t target) []diag.Diag {
-	names := append(generatedMethods(t.field.Type), t.accessor)
+// checkMethods says which methods of named the generated ones, names, would
+// collide with. The ones an earlier run generated are about to be replaced.
+// key spells the directive that marks named.
+func checkMethods(fset *token.FileSet, named *types.Named, names []string, key string) []diag.Diag {
+	name := named.Obj().Name()
 	var diags []diag.Diag
-	for m := range t.Named.Methods() {
+	for m := range named.Methods() {
 		if pos := fset.Position(m.Pos()); slices.Contains(names, m.Name()) && filepath.Base(pos.Filename) != outputFile {
-			diags = append(diags, diag.Errorf(pos, "%s already has a method named %s", t.Name, m.Name()).
-				WithHints("remove it, or the //kanna:"+directiveKey+" on "+t.Name))
+			diags = append(diags, diag.Errorf(pos, "%s already has a method named %s", name, m.Name()).
+				WithHints("remove it, or the //kanna:"+key+" on "+name))
 		}
 	}
 	return diags
 }
 
-// checkFuncs says which declarations of the package the constructors of t
-// would collide with.
-func checkFuncs(fset *token.FileSet, t target) []diag.Diag {
+// checkFuncs says which declarations of the package of named the functions
+// generated for it, funcs, would collide with. key spells the directive that
+// marks named, and as says what the functions are generated as.
+func checkFuncs(fset *token.FileSet, named *types.Named, funcs []string, key, as string) []diag.Diag {
 	var diags []diag.Diag
-	for _, name := range []string{t.newFunc, t.mustFunc} {
-		obj := t.Named.Obj().Pkg().Scope().Lookup(name)
+	for _, fn := range funcs {
+		obj := named.Obj().Pkg().Scope().Lookup(fn)
 		if obj == nil {
 			continue
 		}
 		if pos := fset.Position(obj.Pos()); filepath.Base(pos.Filename) != outputFile {
-			diags = append(diags, diag.Errorf(pos,
-				"%s is already declared, so it cannot be generated as a constructor of %s", name, t.Name).
-				WithHints("remove it, or the //kanna:"+directiveKey+" on "+t.Name))
+			diags = append(diags, diag.Errorf(pos, "%s is already declared, so it cannot be generated %s", fn, as).
+				WithHints("remove it, or the //kanna:"+key+" on "+named.Obj().Name()))
 		}
 	}
 	return diags

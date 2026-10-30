@@ -11,14 +11,17 @@ import (
 // generator names the tool in the header of the file it writes.
 const generator = "kanna-value"
 
-// emit renders the value types of targets into a file of the package pkgName
-// at pkgPath. declared are the top-level names the package declares outside
-// the file, which nothing the file introduces may take.
-func emit(pkgPath, pkgName string, targets []target, declared []string) *gofile.File {
+// emit renders the value types of targets and the enums of enums into a file of
+// the package pkgName at pkgPath. declared are the top-level names the package
+// declares outside the file, which nothing the file introduces may take.
+func emit(pkgPath, pkgName string, targets []target, enums []enum, declared []string) *gofile.File {
 	f := gofile.New(generator, pkgPath, pkgName)
 	f.Reserve(declared...)
 	for _, t := range targets {
 		f.Reserve(t.newFunc, t.mustFunc)
+	}
+	for _, e := range enums {
+		f.Reserve(e.newFunc, e.valuesFunc)
 	}
 
 	for _, t := range targets {
@@ -41,6 +44,13 @@ func emit(pkgPath, pkgName string, targets []target, declared []string) *gofile.
 		}
 		w.writeJSON()
 		w.writeSQL()
+	}
+	for _, e := range enums {
+		w := enumWriter{enum: e, f: f, pkgName: pkgName}
+		w.writeNew()
+		w.writeValues()
+		w.writeUnmarshalText()
+		w.writeScan()
 	}
 	return f
 }
@@ -176,7 +186,7 @@ func (w writer) writeJSON() {
 	fmt.Fprintf(w.f, "if %s := %s.Unmarshal(%s, &%s); %s != nil {\n", err, json, data, v, err)
 	fmt.Fprintf(w.f, "return %s\n", err)
 	fmt.Fprintf(w.f, "}\n")
-	w.keep(x, y, err, v)
+	keep(w.f, w.newFunc, x, y, err, v)
 	fmt.Fprintf(w.f, "}\n\n")
 }
 
@@ -204,31 +214,109 @@ func (w writer) writeSQL() {
 	fmt.Fprintf(w.f, "return %s.New(%q)\n", w.f.Import("errors", "errors"),
 		w.pkgName+": cannot scan NULL into "+w.Name+"; scan a column that may be NULL into *"+w.Name)
 	fmt.Fprintf(w.f, "}\n")
-	w.keep(x, y, err, v+".V")
+	keep(w.f, w.newFunc, x, y, err, v+".V")
 	fmt.Fprintf(w.f, "}\n\n")
 }
 
-// doc writes text as a comment, wrapped at 80 columns.
+// doc writes text as a comment.
 func (w writer) doc(text string) {
+	writeDoc(w.f, text)
+}
+
+// keep ends a method on the pointer x that has decoded value: it builds y from
+// value through the constructor newFunc, and keeps it in x unless the
+// constructor returns err.
+func keep(f *gofile.File, newFunc, x, y, err, value string) {
+	fmt.Fprintf(f, "%s, %s := %s(%s)\n", y, err, newFunc, value)
+	fmt.Fprintf(f, "if %s != nil {\n", err)
+	fmt.Fprintf(f, "return %s\n", err)
+	fmt.Fprintf(f, "}\n")
+	fmt.Fprintf(f, "*%s = %s\n", x, y)
+	fmt.Fprintf(f, "return nil\n")
+}
+
+// enumWriter writes the declarations of one enum.
+type enumWriter struct {
+	enum
+
+	f *gofile.File
+
+	// pkgName starts the errors the generated code reports itself.
+	pkgName string
+}
+
+func (w enumWriter) writeNew() {
+	sc := w.f.Scope()
+	v, x := sc.Name("v"), sc.Name("x")
+
+	writeDoc(w.f, fmt.Sprintf("%s returns %s(%s) if %s is the value of one of the constants of %s, "+
+		"and the rule error inclusion otherwise.", w.newFunc, w.Name, v, v, w.Name))
+	fmt.Fprintf(w.f, "func %s(%s string) (%s, error) {\n", w.newFunc, v, w.Name)
+	fmt.Fprintf(w.f, "switch %s := %s(%s); %s {\n", x, w.Name, v, x)
+	fmt.Fprintf(w.f, "case %s:\n", w.constNames())
+	fmt.Fprintf(w.f, "return %s, nil\n", x)
+	fmt.Fprintf(w.f, "}\n")
+	fmt.Fprintf(w.f, "return \"\", %s.Fail(\"inclusion\")\n", w.f.Import("github.com/go-kanna/value/rule", "rule"))
+	fmt.Fprintf(w.f, "}\n\n")
+}
+
+func (w enumWriter) writeValues() {
+	writeDoc(w.f, fmt.Sprintf("%s returns the constants of %s in the order they are declared, "+
+		"in a slice of its own on each call.", w.valuesFunc, w.Name))
+	fmt.Fprintf(w.f, "func %s() []%s {\n", w.valuesFunc, w.Name)
+	fmt.Fprintf(w.f, "return []%s{%s}\n", w.Name, w.constNames())
+	fmt.Fprintf(w.f, "}\n\n")
+}
+
+func (w enumWriter) writeUnmarshalText() {
+	sc := w.f.Scope()
+	x, text, y, err := sc.Name("x"), sc.Name("text"), sc.Name("y"), sc.Name("err")
+
+	writeDoc(w.f, fmt.Sprintf("UnmarshalText sets %s to %s(%s) if %s accepts it, as encoding/json does "+
+		"for a JSON string. On error %s is left as it was.", x, w.Name, text, w.newFunc, x))
+	fmt.Fprintf(w.f, "func (%s *%s) UnmarshalText(%s []byte) error {\n", x, w.Name, text)
+	keep(w.f, w.newFunc, x, y, err, "string("+text+")")
+	fmt.Fprintf(w.f, "}\n\n")
+}
+
+func (w enumWriter) writeScan() {
+	sc := w.f.Scope()
+	x, src, v, y, err := sc.Name("x"), sc.Name("src"), sc.Name("v"), sc.Name("y"), sc.Name("err")
+
+	writeDoc(w.f, fmt.Sprintf("Scan reads a string from a database column, and sets %s to it if %s accepts it. "+
+		"On error %s is left as it was. NULL is an error: scan a column that may be NULL into a pointer to %s.",
+		x, w.newFunc, x, w.Name))
+	fmt.Fprintf(w.f, "func (%s *%s) Scan(%s any) error {\n", x, w.Name, src)
+	fmt.Fprintf(w.f, "var %s %s.Null[string]\n", v, w.f.Import("database/sql", "sql"))
+	fmt.Fprintf(w.f, "if %s := %s.Scan(%s); %s != nil {\n", err, v, src, err)
+	fmt.Fprintf(w.f, "return %s\n", err)
+	fmt.Fprintf(w.f, "}\n")
+	fmt.Fprintf(w.f, "if !%s.Valid {\n", v)
+	fmt.Fprintf(w.f, "return %s.New(%q)\n", w.f.Import("errors", "errors"),
+		w.pkgName+": cannot scan NULL into "+w.Name+"; scan a column that may be NULL into *"+w.Name)
+	fmt.Fprintf(w.f, "}\n")
+	keep(w.f, w.newFunc, x, y, err, v+".V")
+	fmt.Fprintf(w.f, "}\n\n")
+}
+
+// constNames lists the constants of the enum, separated by commas.
+func (w enumWriter) constNames() string {
+	names := make([]string, len(w.consts))
+	for i, c := range w.consts {
+		names[i] = c.Name()
+	}
+	return strings.Join(names, ", ")
+}
+
+// writeDoc writes text to f as a comment, wrapped at 80 columns.
+func writeDoc(f *gofile.File, text string) {
 	line := "//"
 	for word := range strings.FieldsSeq(text) {
 		if len(line)+1+len(word) > 80 && line != "//" {
-			fmt.Fprintln(w.f, line)
+			fmt.Fprintln(f, line)
 			line = "//"
 		}
 		line += " " + word
 	}
-	fmt.Fprintln(w.f, line)
-}
-
-// keep ends a method on the pointer x that has decoded value: it builds y from
-// value through the constructor, and keeps it in x unless the constructor
-// returns err.
-func (w writer) keep(x, y, err, value string) {
-	fmt.Fprintf(w.f, "%s, %s := %s(%s)\n", y, err, w.newFunc, value)
-	fmt.Fprintf(w.f, "if %s != nil {\n", err)
-	fmt.Fprintf(w.f, "return %s\n", err)
-	fmt.Fprintf(w.f, "}\n")
-	fmt.Fprintf(w.f, "*%s = %s\n", x, y)
-	fmt.Fprintf(w.f, "return nil\n")
+	fmt.Fprintln(f, line)
 }

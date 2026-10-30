@@ -23,9 +23,10 @@ type config struct {
 // Command returns kanna-value.
 func Command() cli.Command[config] {
 	return cli.Command[config]{
-		Name:    generator,
-		Summary: "generate value types from structs marked //kanna:" + directiveKey,
-		Args:    "[packages]",
+		Name: generator,
+		Summary: "generate value types from structs marked //kanna:" + directiveKey +
+			", and enums from string types marked //kanna:" + enumKey,
+		Args: "[packages]",
 		Help: "The packages default to the one in the current directory, so that\n" +
 			"//go:generate go tool " + generator + " needs no argument.",
 		Flags: func(fs *flag.FlagSet, cfg *config) {
@@ -69,20 +70,27 @@ func run(dir string, cfg config, patterns []string) ([]output.Change, []diag.Dia
 			in = patterns // which matched no package
 		}
 		diags = append(diags, diag.Warningf(token.Position{},
-			"no struct is marked //kanna:%s in %s", directiveKey, strings.Join(in, ", ")))
+			"nothing is marked //kanna:%s or //kanna:%s in %s", directiveKey, enumKey, strings.Join(in, ", ")))
 	}
 	return changes, diags
 }
 
-// written returns what the run writes for the value types of set, by full
-// name: their constructors, and their methods.
+// written returns what the run writes for the value types and the enums of
+// set, by full name: their functions, and their methods.
 func written(set packages.Set) map[string]bool {
 	found, _ := targets(set.Fset, scan.Structs(set.Packages))
+	marked, _ := enums(set.Fset, scan.Types(set.Packages))
 	names := make(map[string]bool)
 	for _, t := range found {
 		names[t.PkgPath+"."+t.newFunc], names[t.PkgPath+"."+t.mustFunc] = true, true
 		for _, m := range append(generatedMethods(t.field.Type), t.accessor) {
 			names[t.PkgPath+"."+t.Name+"."+m] = true
+		}
+	}
+	for _, e := range marked {
+		names[e.PkgPath+"."+e.newFunc], names[e.PkgPath+"."+e.valuesFunc] = true, true
+		for _, m := range enumMethods {
+			names[e.PkgPath+"."+e.Name+"."+m] = true
 		}
 	}
 	return names
@@ -93,13 +101,18 @@ func written(set packages.Set) map[string]bool {
 // package without any.
 func generate(set packages.Set) ([]output.Change, []diag.Diag) {
 	found, diags := targets(set.Fset, scan.Structs(set.Packages))
-	if diag.HasErrors(diags) {
+	marked, ds := enums(set.Fset, scan.Types(set.Packages))
+	if diags = append(diags, ds...); diag.HasErrors(diags) {
 		return nil, diags
 	}
 
 	byPkg := make(map[string][]target)
 	for _, t := range found {
 		byPkg[t.PkgPath] = append(byPkg[t.PkgPath], t)
+	}
+	enumsByPkg := make(map[string][]enum)
+	for _, e := range marked {
+		enumsByPkg[e.PkgPath] = append(enumsByPkg[e.PkgPath], e)
 	}
 
 	var changes []output.Change
@@ -110,10 +123,10 @@ func generate(set packages.Set) ([]output.Change, []diag.Diag) {
 		dir := filepath.Dir(pkg.GoFiles[0])
 		path := filepath.Join(dir, outputFile)
 
-		pkgTargets := byPkg[pkg.PkgPath]
-		if len(pkgTargets) == 0 {
-			// A package whose structs have all lost the directive keeps the
-			// types an earlier run generated unless the file goes as well.
+		pkgTargets, pkgEnums := byPkg[pkg.PkgPath], enumsByPkg[pkg.PkgPath]
+		if len(pkgTargets) == 0 && len(pkgEnums) == 0 {
+			// A package whose types have all lost the directive keeps what an
+			// earlier run generated for them unless the file goes as well.
 			if packages.GeneratedFiles(pkg)[path] {
 				changes = append(changes, output.Change{Path: path, Remove: true})
 			}
@@ -121,7 +134,7 @@ func generate(set packages.Set) ([]output.Change, []diag.Diag) {
 		}
 
 		declared := slices.Sorted(maps.Keys(output.DeclaredNames(dir, outputFile, pkg.Name)))
-		f := emit(pkg.PkgPath, pkg.Name, pkgTargets, declared)
+		f := emit(pkg.PkgPath, pkg.Name, pkgTargets, pkgEnums, declared)
 		src, err := f.Bytes()
 		if err != nil {
 			return nil, append(diags, diag.Errorf(token.Position{Filename: path}, "generated code does not parse: %v", err))

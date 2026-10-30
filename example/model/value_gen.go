@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"slices"
 	"time"
+
+	"github.com/go-kanna/value/rule"
 )
 
 // NewEmail returns the Email holding v if the validate method of Email accepts
@@ -259,6 +261,52 @@ func (x *Tags) Scan(src any) error {
 		return errors.New("model: cannot scan NULL into Tags; scan a column that may be NULL into *Tags")
 	}
 	y, err := NewTags(v.V)
+	if err != nil {
+		return err
+	}
+	*x = y
+	return nil
+}
+
+// NewPriority returns Priority(v) if v is the value of one of the constants of
+// Priority, and the rule error inclusion otherwise.
+func NewPriority(v string) (Priority, error) {
+	switch x := Priority(v); x {
+	case PriorityLow, PriorityNormal, PriorityHigh:
+		return x, nil
+	}
+	return "", rule.Fail("inclusion")
+}
+
+// PriorityValues returns the constants of Priority in the order they are
+// declared, in a slice of its own on each call.
+func PriorityValues() []Priority {
+	return []Priority{PriorityLow, PriorityNormal, PriorityHigh}
+}
+
+// UnmarshalText sets x to Priority(text) if NewPriority accepts it, as
+// encoding/json does for a JSON string. On error x is left as it was.
+func (x *Priority) UnmarshalText(text []byte) error {
+	y, err := NewPriority(string(text))
+	if err != nil {
+		return err
+	}
+	*x = y
+	return nil
+}
+
+// Scan reads a string from a database column, and sets x to it if NewPriority
+// accepts it. On error x is left as it was. NULL is an error: scan a column
+// that may be NULL into a pointer to Priority.
+func (x *Priority) Scan(src any) error {
+	var v sql.Null[string]
+	if err := v.Scan(src); err != nil {
+		return err
+	}
+	if !v.Valid {
+		return errors.New("model: cannot scan NULL into Priority; scan a column that may be NULL into *Priority")
+	}
+	y, err := NewPriority(v.V)
 	if err != nil {
 		return err
 	}

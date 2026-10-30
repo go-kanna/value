@@ -11,6 +11,8 @@ import (
 	"maps"
 	"slices"
 	"time"
+
+	"github.com/go-kanna/value/rule"
 )
 
 // NewCompletedAt returns the CompletedAt holding v if the validate method of
@@ -590,6 +592,98 @@ func (x *Address) Scan(src any) error {
 		return errors.New("emit: cannot scan NULL into Address; scan a column that may be NULL into *Address")
 	}
 	y, err := NewAddress(v.V)
+	if err != nil {
+		return err
+	}
+	*x = y
+	return nil
+}
+
+// NewStatus returns Status(v) if v is the value of one of the constants of
+// Status, and the rule error inclusion otherwise.
+func NewStatus(v string) (Status, error) {
+	switch x := Status(v); x {
+	case StatusPlaced, StatusPaid, StatusShipped:
+		return x, nil
+	}
+	return "", rule.Fail("inclusion")
+}
+
+// StatusValues returns the constants of Status in the order they are declared,
+// in a slice of its own on each call.
+func StatusValues() []Status {
+	return []Status{StatusPlaced, StatusPaid, StatusShipped}
+}
+
+// UnmarshalText sets x to Status(text) if NewStatus accepts it, as
+// encoding/json does for a JSON string. On error x is left as it was.
+func (x *Status) UnmarshalText(text []byte) error {
+	y, err := NewStatus(string(text))
+	if err != nil {
+		return err
+	}
+	*x = y
+	return nil
+}
+
+// Scan reads a string from a database column, and sets x to it if NewStatus
+// accepts it. On error x is left as it was. NULL is an error: scan a column
+// that may be NULL into a pointer to Status.
+func (x *Status) Scan(src any) error {
+	var v sql.Null[string]
+	if err := v.Scan(src); err != nil {
+		return err
+	}
+	if !v.Valid {
+		return errors.New("emit: cannot scan NULL into Status; scan a column that may be NULL into *Status")
+	}
+	y, err := NewStatus(v.V)
+	if err != nil {
+		return err
+	}
+	*x = y
+	return nil
+}
+
+// newKind returns kind(v) if v is the value of one of the constants of kind,
+// and the rule error inclusion otherwise.
+func newKind(v string) (kind, error) {
+	switch x := kind(v); x {
+	case kindA:
+		return x, nil
+	}
+	return "", rule.Fail("inclusion")
+}
+
+// kindValues returns the constants of kind in the order they are declared, in a
+// slice of its own on each call.
+func kindValues() []kind {
+	return []kind{kindA}
+}
+
+// UnmarshalText sets x to kind(text) if newKind accepts it, as encoding/json
+// does for a JSON string. On error x is left as it was.
+func (x *kind) UnmarshalText(text []byte) error {
+	y, err := newKind(string(text))
+	if err != nil {
+		return err
+	}
+	*x = y
+	return nil
+}
+
+// Scan reads a string from a database column, and sets x to it if newKind
+// accepts it. On error x is left as it was. NULL is an error: scan a column
+// that may be NULL into a pointer to kind.
+func (x *kind) Scan(src any) error {
+	var v sql.Null[string]
+	if err := v.Scan(src); err != nil {
+		return err
+	}
+	if !v.Valid {
+		return errors.New("emit: cannot scan NULL into kind; scan a column that may be NULL into *kind")
+	}
+	y, err := newKind(v.V)
 	if err != nil {
 		return err
 	}

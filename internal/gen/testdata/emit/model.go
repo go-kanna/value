@@ -84,3 +84,21 @@ type address struct{ lines []string }
 type Address struct{ a address }
 
 func (Address) validate(address) error { return nil }
+
+// Status is an enum.
+//
+//kanna:enum
+type Status string
+
+const (
+	StatusPlaced  Status = "placed"
+	StatusPaid    Status = "paid"
+	StatusShipped Status = "shipped"
+)
+
+// kind is unexported, and so are its functions.
+//
+//kanna:enum
+type kind string
+
+const kindA kind = "a"

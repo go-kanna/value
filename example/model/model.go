@@ -1,6 +1,7 @@
 // Package model declares the values a task service deals in. kanna-value
 // turns each struct marked //kanna:value into a type, in value_gen.go, that
-// only ever holds what its validate method accepts.
+// only ever holds what its validate method accepts, and lets in only the
+// constants of each string type marked //kanna:enum.
 package model
 
 import (
@@ -58,11 +59,25 @@ func (Tags) validate(t tags) error {
 	return nil
 }
 
+// Priority is how soon a task is to be done. It stays a string type, whose
+// constants a switch takes as usual; the generated code reads only those from
+// JSON, text, and a database.
+//
+//kanna:enum
+type Priority string
+
+const (
+	PriorityLow    Priority = "low"
+	PriorityNormal Priority = "normal"
+	PriorityHigh   Priority = "high"
+)
+
 // Task is a thing to be done, decoded from a request as it stands: each value
 // checks itself while it is decoded.
 type Task struct {
 	Title       string       `json:"title"`
 	Owner       Email        `json:"owner"`
+	Priority    Priority     `json:"priority"`
 	Tags        Tags         `json:"tags,omitzero"`
 	CompletedAt *CompletedAt `json:"completed_at,omitempty"`
 }

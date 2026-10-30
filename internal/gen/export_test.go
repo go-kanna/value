@@ -2,6 +2,7 @@ package gen
 
 import (
 	"fmt"
+	"go/constant"
 	"go/token"
 	"strings"
 
@@ -50,13 +51,36 @@ func Targets(fset *token.FileSet, pkgs []*packages.Package) ([]string, []string)
 	return spelled, msgs
 }
 
-// Emit renders the file the targets in pkgs, which make one package, are
-// generated into. declared are the top-level names the package declares
-// besides.
+// Enums finds the enums in pkgs, spelling each as its type, its constants, and
+// its functions, such as "Status placed,paid NewStatus/StatusValues"; and
+// spelling each diagnostic as diag.Diag.String does.
+func Enums(fset *token.FileSet, pkgs []*packages.Package) ([]string, []string) {
+	found, diags := enums(fset, scan.Types(pkgs))
+
+	spelled := make([]string, len(found))
+	for i, e := range found {
+		values := make([]string, len(e.consts))
+		for j, c := range e.consts {
+			values[j] = constant.StringVal(c.Val())
+		}
+		spelled[i] = e.Name + " " + strings.Join(values, ",") + " " + e.newFunc + "/" + e.valuesFunc
+	}
+	msgs := make([]string, len(diags))
+	for i, d := range diags {
+		msgs[i] = d.String()
+	}
+	return spelled, msgs
+}
+
+// Emit renders the file the targets and the enums in pkgs, which make one
+// package, are generated into. declared are the top-level names the package
+// declares besides.
 func Emit(fset *token.FileSet, pkgs []*packages.Package, declared []string) ([]byte, error) {
 	found, diags := targets(fset, scan.Structs(pkgs))
-	if len(diags) > 0 {
+	marked, ds := enums(fset, scan.Types(pkgs))
+	if diags = append(diags, ds...); len(diags) > 0 {
 		return nil, fmt.Errorf("%v", diags)
 	}
-	return emit(pkgs[0].PkgPath, pkgs[0].Name, found, declared).Bytes() //nolint:wrapcheck // the test shows it as it is
+	//nolint:wrapcheck // the test shows it as it is
+	return emit(pkgs[0].PkgPath, pkgs[0].Name, found, marked, declared).Bytes()
 }
