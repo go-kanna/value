@@ -4,7 +4,7 @@ go 1.26.0
 
 toolchain go1.26.9
 
-require github.com/go-kanna/internal v0.0.14-0.20261030085315-01d90d42013f
+require github.com/go-kanna/internal v0.0.14
 
 require (
 	golang.org/x/mod v0.42.0 // indirect
