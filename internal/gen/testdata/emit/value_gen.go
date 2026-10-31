@@ -645,6 +645,13 @@ func (x *Status) Scan(src any) error {
 	return nil
 }
 
+// Validate returns the rule error inclusion unless x is the value of one of the
+// constants of Status, as a conversion may leave it.
+func (x Status) Validate() error {
+	_, err := NewStatus(string(x))
+	return err
+}
+
 // newKind returns kind(v) if v is the value of one of the constants of kind,
 // and the rule error inclusion otherwise.
 func newKind(v string) (kind, error) {
@@ -689,4 +696,11 @@ func (x *kind) Scan(src any) error {
 	}
 	*x = y
 	return nil
+}
+
+// Validate returns the rule error inclusion unless x is the value of one of the
+// constants of kind, as a conversion may leave it.
+func (x kind) Validate() error {
+	_, err := newKind(string(x))
+	return err
 }

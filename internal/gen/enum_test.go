@@ -182,6 +182,20 @@ func (s *Status) UnmarshalText([]byte) error { return nil }
 				"  remove it, or the //kanna:enum on Status",
 		},
 		{
+			name: "hand-written Validate",
+			src: `package test
+
+//kanna:enum
+type Status string
+
+const StatusA Status = "a"
+
+func (s Status) Validate() error { return nil }
+`,
+			want: "test.go:8:17: error: Status already has a method named Validate\n" +
+				"  remove it, or the //kanna:enum on Status",
+		},
+		{
 			name: "hand-written function",
 			src: `package test
 

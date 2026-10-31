@@ -267,6 +267,19 @@ func TestGenerated_EnumNew(t *testing.T) {
 	}
 }
 
+func TestGenerated_EnumValidate(t *testing.T) {
+	t.Parallel()
+
+	for _, s := range emit.StatusValues() {
+		if err := s.Validate(); err != nil {
+			t.Errorf("%q.Validate() = %v, want nil", s, err)
+		}
+	}
+	for _, s := range []emit.Status{"", "Paid", "refunded"} {
+		wantCode(t, s.Validate(), "inclusion")
+	}
+}
+
 func TestGenerated_EnumValues(t *testing.T) {
 	t.Parallel()
 

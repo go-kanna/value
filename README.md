@@ -166,6 +166,7 @@ func NewOrderStatus(v string) (OrderStatus, error)    // OrderStatus(v), if it i
 func OrderStatusValues() []OrderStatus                 // the constants in the order they are declared, in a new slice
 func (x *OrderStatus) UnmarshalText(text []byte) error // what encoding/json decodes a string or an object key with
 func (x *OrderStatus) Scan(src any) error
+func (x OrderStatus) Validate() error                  // whether x is the value of a constant, which kanna-validate calls
 ```
 
 Each of them rejects a value that is none of the constants with `rule.Fail("inclusion")`, the code kanna-validate's
@@ -175,7 +176,8 @@ The type stays a string type with constants, so a `switch` over them, linters ch
 other generators reading the constants work as before. Nothing is generated to encode a value, as encoding/json and
 database/sql already send it as the string it is. What the generated code checks is what comes from outside: within the
 program, `OrderStatus("shiped")` compiles as for any string type, so make values with the constants or with
-`NewOrderStatus`.
+`NewOrderStatus`. `Validate` catches a value that did not come from either, and the zero value, which is no constant
+either: use a `*OrderStatus` where a value may be absent.
 
 An enum that cannot be generated stops generation:
 

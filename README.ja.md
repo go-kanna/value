@@ -148,11 +148,12 @@ func NewOrderStatus(v string) (OrderStatus, error)    // OrderStatus(v), if it i
 func OrderStatusValues() []OrderStatus                 // the constants in the order they are declared, in a new slice
 func (x *OrderStatus) UnmarshalText(text []byte) error // what encoding/json decodes a string or an object key with
 func (x *OrderStatus) Scan(src any) error
+func (x OrderStatus) Validate() error                  // whether x is the value of a constant, which kanna-validate calls
 ```
 
 これらはいずれも、どの定数でもない値を `rule.Fail("inclusion")` で拒否し（kanna-validate の `oneof` が報告するのと同じコードです）、値を変更しません。NULL のカラムは、値オブジェクトと同じくエラーになります。
 
-型は定数を持つ string 型のままなので、定数に対する `switch`、switch の網羅性を調べる linter、定数を読み取る他のジェネレータは、これまでどおり動きます。値をエンコードするコードは生成されません。encoding/json も database/sql も、もともと string としてそのまま送るからです。生成されたコードがチェックするのは外部から来る値です。プログラム内では、他の string 型と同じく `OrderStatus("shiped")` もコンパイルが通るので、値は定数か `NewOrderStatus` で作ってください。
+型は定数を持つ string 型のままなので、定数に対する `switch`、switch の網羅性を調べる linter、定数を読み取る他のジェネレータは、これまでどおり動きます。値をエンコードするコードは生成されません。encoding/json も database/sql も、もともと string としてそのまま送るからです。生成されたコードがチェックするのは外部から来る値です。プログラム内では、他の string 型と同じく `OrderStatus("shiped")` もコンパイルが通るので、値は定数か `NewOrderStatus` で作ってください。そのどちらからも作られなかった値は `Validate` で検出できます。ゼロ値も定数ではないので拒否されます。値がない場合があるなら `*OrderStatus` を使ってください。
 
 生成できない enum は、生成を止めます:
 
