@@ -313,3 +313,10 @@ func (x *Priority) Scan(src any) error {
 	*x = y
 	return nil
 }
+
+// Validate returns the rule error inclusion unless x is the value of one of the
+// constants of Priority, as a conversion may leave it.
+func (x Priority) Validate() error {
+	_, err := NewPriority(string(x))
+	return err
+}

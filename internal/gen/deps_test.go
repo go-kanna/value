@@ -40,7 +40,9 @@ func TestDeps(t *testing.T) {
 	if len(r.Writes) != 1 || !strings.HasSuffix(r.Writes[0], filepath.Join("p", "value_gen.go")) {
 		t.Errorf("Writes = %q", r.Writes)
 	}
-	for _, name := range []string{"example.com/app/p.NewEmail", "example.com/app/p.NewColor"} {
+	for _, name := range []string{
+		"example.com/app/p.NewEmail", "example.com/app/p.NewColor", "example.com/app/p.Color.Validate",
+	} {
 		if !slices.Contains(r.Declares, name) {
 			t.Errorf("Declares = %q, want %s among them", r.Declares, name)
 		}

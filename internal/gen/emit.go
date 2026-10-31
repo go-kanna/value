@@ -51,6 +51,7 @@ func emit(pkgPath, pkgName string, targets []target, enums []enum, declared []st
 		w.writeValues()
 		w.writeUnmarshalText()
 		w.writeScan()
+		w.writeValidate()
 	}
 	return f
 }
@@ -296,6 +297,18 @@ func (w enumWriter) writeScan() {
 		w.pkgName+": cannot scan NULL into "+w.Name+"; scan a column that may be NULL into *"+w.Name)
 	fmt.Fprintf(w.f, "}\n")
 	keep(w.f, w.newFunc, x, y, err, v+".V")
+	fmt.Fprintf(w.f, "}\n\n")
+}
+
+func (w enumWriter) writeValidate() {
+	sc := w.f.Scope()
+	x, err := sc.Name("x"), sc.Name("err")
+
+	writeDoc(w.f, fmt.Sprintf("Validate returns the rule error inclusion unless %s is the value of one of the "+
+		"constants of %s, as a conversion may leave it.", x, w.Name))
+	fmt.Fprintf(w.f, "func (%s %s) Validate() error {\n", x, w.Name)
+	fmt.Fprintf(w.f, "_, %s := %s(string(%s))\n", err, w.newFunc, x)
+	fmt.Fprintf(w.f, "return %s\n", err)
 	fmt.Fprintf(w.f, "}\n\n")
 }
 
