@@ -11,7 +11,7 @@ kanna-value turns a struct holding one value and a `validate` method into a valu
 and JSON and SQL methods — that holds only what its rule accepts, wherever the value comes from. It also turns a string
 type with constants into an enum that reads from outside only the values of its constants.
 
-Part of the [kanna](https://github.com/go-kanna/kanna) family of code generators. Requires Go 1.26.
+Part of the [kanna](https://go-kanna.github.io/) family of code generators. Requires Go 1.26.
 
 ## Install
 
