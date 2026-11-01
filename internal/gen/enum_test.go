@@ -58,6 +58,8 @@ package test
 func NewRegenerated(v string) (Regenerated, error) { return Regenerated(v), nil }
 
 func (x *Regenerated) Scan(any) error { return nil }
+
+func (x Regenerated) String() string { return string(x) }
 `,
 	})
 
@@ -179,6 +181,20 @@ const StatusA Status = "a"
 func (s *Status) UnmarshalText([]byte) error { return nil }
 `,
 			want: "test.go:8:18: error: Status already has a method named UnmarshalText\n" +
+				"  remove it, or the //kanna:enum on Status",
+		},
+		{
+			name: "hand-written String",
+			src: `package test
+
+//kanna:enum
+type Status string
+
+const StatusA Status = "a"
+
+func (s Status) String() string { return string(s) }
+`,
+			want: "test.go:8:17: error: Status already has a method named String\n" +
 				"  remove it, or the //kanna:enum on Status",
 		},
 		{

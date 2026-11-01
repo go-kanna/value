@@ -164,13 +164,18 @@ const (
 ```go
 func NewOrderStatus(v string) (OrderStatus, error)    // OrderStatus(v), if it is the value of a constant
 func OrderStatusValues() []OrderStatus                 // the constants in the order they are declared, in a new slice
+func (x OrderStatus) String() string                   // the underlying string; implements fmt.Stringer
 func (x *OrderStatus) UnmarshalText(text []byte) error // what encoding/json decodes a string or an object key with
 func (x *OrderStatus) Scan(src any) error
 func (x OrderStatus) Validate() error                  // whether x is the value of a constant, which kanna-validate calls
 ```
 
-Each of them rejects a value that is none of the constants with `rule.Fail("inclusion")`, the code kanna-validate's
-`oneof` reports too, and leaves the value as it was. A NULL column is an error, as for a value type.
+`String` returns the underlying string without validating it, including for the zero value or an unchecked cast.
+Remove a hand-written `String` method before generating, as for other generated method names.
+
+The constructor, decoding, scanning, and validation methods reject a value that is none of the constants with
+`rule.Fail("inclusion")`, the code kanna-validate's `oneof` reports too, and leave the value as it was. A NULL column is
+an error, as for a value type.
 
 The type stays a string type with constants, so a `switch` over them, linters checking that a switch is exhaustive, and
 other generators reading the constants work as before. Nothing is generated to encode a value, as encoding/json and

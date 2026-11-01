@@ -49,6 +49,7 @@ func emit(pkgPath, pkgName string, targets []target, enums []enum, declared []st
 		w := enumWriter{enum: e, f: f, pkgName: pkgName}
 		w.writeNew()
 		w.writeValues()
+		w.writeString()
 		w.writeUnmarshalText()
 		w.writeScan()
 		w.writeValidate()
@@ -267,6 +268,12 @@ func (w enumWriter) writeValues() {
 	fmt.Fprintf(w.f, "func %s() []%s {\n", w.valuesFunc, w.Name)
 	fmt.Fprintf(w.f, "return []%s{%s}\n", w.Name, w.constNames())
 	fmt.Fprintf(w.f, "}\n\n")
+}
+
+func (w enumWriter) writeString() {
+	x := w.f.Scope().Name("x")
+	writeDoc(w.f, "String returns the underlying string.")
+	fmt.Fprintf(w.f, "func (%s %s) String() string { return string(%s) }\n\n", x, w.Name, x)
 }
 
 func (w enumWriter) writeUnmarshalText() {

@@ -42,6 +42,7 @@ func TestDeps(t *testing.T) {
 	}
 	for _, name := range []string{
 		"example.com/app/p.NewEmail", "example.com/app/p.NewColor", "example.com/app/p.Color.Validate",
+		"example.com/app/p.Color.String",
 	} {
 		if !slices.Contains(r.Declares, name) {
 			t.Errorf("Declares = %q, want %s among them", r.Declares, name)

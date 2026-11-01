@@ -284,6 +284,9 @@ func PriorityValues() []Priority {
 	return []Priority{PriorityLow, PriorityNormal, PriorityHigh}
 }
 
+// String returns the underlying string.
+func (x Priority) String() string { return string(x) }
+
 // UnmarshalText sets x to Priority(text) if NewPriority accepts it, as
 // encoding/json does for a JSON string. On error x is left as it was.
 func (x *Priority) UnmarshalText(text []byte) error {

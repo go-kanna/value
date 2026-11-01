@@ -615,6 +615,9 @@ func StatusValues() []Status {
 	return []Status{StatusPlaced, StatusPaid, StatusShipped}
 }
 
+// String returns the underlying string.
+func (x Status) String() string { return string(x) }
+
 // UnmarshalText sets x to Status(text) if NewStatus accepts it, as
 // encoding/json does for a JSON string. On error x is left as it was.
 func (x *Status) UnmarshalText(text []byte) error {
@@ -667,6 +670,9 @@ func newKind(v string) (kind, error) {
 func kindValues() []kind {
 	return []kind{kindA}
 }
+
+// String returns the underlying string.
+func (x kind) String() string { return string(x) }
 
 // UnmarshalText sets x to kind(text) if newKind accepts it, as encoding/json
 // does for a JSON string. On error x is left as it was.
