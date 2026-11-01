@@ -267,6 +267,27 @@ func TestGenerated_EnumNew(t *testing.T) {
 	}
 }
 
+func TestGenerated_EnumString(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		value emit.Status
+		want  string
+	}{
+		{emit.StatusPaid, "paid"},
+		{emit.Status(""), ""},
+		{emit.Status("unknown"), "unknown"},
+	} {
+		var stringer fmt.Stringer = tt.value
+		if got := stringer.String(); got != tt.want {
+			t.Errorf("String() = %q, want %q", got, tt.want)
+		}
+		if got := fmt.Sprint(tt.value); got != tt.want {
+			t.Errorf("fmt.Sprint = %q, want %q", got, tt.want)
+		}
+	}
+}
+
 func TestGenerated_EnumValidate(t *testing.T) {
 	t.Parallel()
 
