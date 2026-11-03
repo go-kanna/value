@@ -117,7 +117,7 @@ For a struct `X` holding a value of type `T` in its field `t`:
 | `IsZero() bool`                                | the value's own `IsZero` if it has one, or else `==` with the zero value, or `== nil` for a slice or a map                       |
 | `Equal(y X) bool`                              | only when `T` has `Equal(T) bool`, as `time.Time` does                                                                           |
 | `MarshalJSON`, `UnmarshalJSON`                 | encode the value as `T` encodes; decode a `T` and keep it only if `validate` accepts it                                          |
-| `Value`, `Scan`                                | convert the value as database/sql converts a `T`; scan a `T` and keep it only if `validate` accepts it                           |
+| `Value`, `Scan`                                | only when database/sql converts a `T` both ways; convert the value as it converts a `T`; scan a `T` and keep it only if `validate` accepts it |
 
 An unexported struct gets unexported constructors, `newX` and `mustX`.
 
@@ -136,12 +136,16 @@ A few things follow from what `T` is:
   Where a value of zero and no value at all mean different things, hold a `*Price`, nil when none was given.
 - `Equal` exists because `==` can be wrong for a time: two of the same instant differ when one carries a monotonic
   clock reading or another location, as a time read back from a database does.
+- database/sql converts a `T` both ways when it is a bool, a number other than a complex one, a string, a `[]byte`, a
+  `time.Time` or a `uuid.UUID`, or when its value has `Value() (driver.Value, error)` and its pointer `Scan(any) error`.
+  Any other `T`, such as `type tags []string`, gets no `Value` or `Scan`, which would fail whatever it held: to store
+  one, write them yourself.
 
 Decoding and scanning leave the value as it was on any error, and so does JSON null. A NULL column is an error: scan a
 column that may be NULL into a `*X`, which database/sql sets to nil.
 
 A method or a constructor you have written under one of the generated names stops generation instead of being
-overwritten. `Equal` and `IsZero` are yours to write when none is generated.
+overwritten. `Equal`, `IsZero`, `Value` and `Scan` are yours to write when none is generated.
 
 ## Enums
 

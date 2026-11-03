@@ -43,7 +43,9 @@ func emit(pkgPath, pkgName string, targets []target, enums []enum, declared []st
 			w.writeEqual()
 		}
 		w.writeJSON()
-		w.writeSQL()
+		if t.sql {
+			w.writeSQL()
+		}
 	}
 	for _, e := range enums {
 		w := enumWriter{enum: e, f: f, pkgName: pkgName}
