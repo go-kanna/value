@@ -96,7 +96,7 @@ func checkEnum(fset *token.FileSet, t scan.Type, d directive.Directive) (enum, [
 			WithHints("declare it as type "+t.Name+" string"))
 	}
 
-	e := enum{Type: t, consts: enumtype.Constants(t.Named)}
+	e := enum{Type: t, consts: enumtype.Constants(t.Named, fset)}
 	e.newFunc, e.valuesFunc = enumtype.Funcs(t.Name)
 	if len(e.consts) == 0 {
 		return enum{}, append(diags, diag.Errorf(t.Pos, "%s has no constants to be one of", t.Name).
