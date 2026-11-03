@@ -411,31 +411,6 @@ func (x *Tags) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Value returns the tags that x holds for a database driver, converted as
-// database/sql converts an argument of tags.
-func (x Tags) Value() (driver.Value, error) {
-	return driver.DefaultParameterConverter.ConvertValue(x.t)
-}
-
-// Scan reads a value of tags from a database column, and keeps it only if the
-// validate method of Tags accepts it. On error x is left as it was. NULL is an
-// error: scan a column that may be NULL into a pointer to Tags.
-func (x *Tags) Scan(src any) error {
-	var v sql.Null[tags]
-	if err := v.Scan(src); err != nil {
-		return err
-	}
-	if !v.Valid {
-		return errors.New("emit: cannot scan NULL into Tags; scan a column that may be NULL into *Tags")
-	}
-	y, err := NewTags(v.V)
-	if err != nil {
-		return err
-	}
-	*x = y
-	return nil
-}
-
 // NewLabels returns the Labels holding a copy of v if the validate method of
 // Labels accepts it, and the method's error otherwise.
 func NewLabels(v labels) (Labels, error) {
@@ -496,31 +471,6 @@ func (x *Labels) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Value returns the labels that x holds for a database driver, converted as
-// database/sql converts an argument of labels.
-func (x Labels) Value() (driver.Value, error) {
-	return driver.DefaultParameterConverter.ConvertValue(x.l)
-}
-
-// Scan reads a value of labels from a database column, and keeps it only if the
-// validate method of Labels accepts it. On error x is left as it was. NULL is
-// an error: scan a column that may be NULL into a pointer to Labels.
-func (x *Labels) Scan(src any) error {
-	var v sql.Null[labels]
-	if err := v.Scan(src); err != nil {
-		return err
-	}
-	if !v.Valid {
-		return errors.New("emit: cannot scan NULL into Labels; scan a column that may be NULL into *Labels")
-	}
-	y, err := NewLabels(v.V)
-	if err != nil {
-		return err
-	}
-	*x = y
-	return nil
-}
-
 // NewAddress returns the Address holding v if the validate method of Address
 // accepts it, and the method's error otherwise.
 func NewAddress(v address) (Address, error) {
@@ -567,31 +517,6 @@ func (x *Address) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	y, err := NewAddress(v)
-	if err != nil {
-		return err
-	}
-	*x = y
-	return nil
-}
-
-// Value returns the address that x holds for a database driver, converted as
-// database/sql converts an argument of address.
-func (x Address) Value() (driver.Value, error) {
-	return driver.DefaultParameterConverter.ConvertValue(x.a)
-}
-
-// Scan reads a value of address from a database column, and keeps it only if
-// the validate method of Address accepts it. On error x is left as it was. NULL
-// is an error: scan a column that may be NULL into a pointer to Address.
-func (x *Address) Scan(src any) error {
-	var v sql.Null[address]
-	if err := v.Scan(src); err != nil {
-		return err
-	}
-	if !v.Valid {
-		return errors.New("emit: cannot scan NULL into Address; scan a column that may be NULL into *Address")
-	}
-	y, err := NewAddress(v.V)
 	if err != nil {
 		return err
 	}

@@ -45,12 +45,12 @@ func TestEmit_KeepsClearOfDeclaredNames(t *testing.T) {
 
 	pkg := pkgtest.Load(t, map[string]string{"test.go": `package test
 
-type tags []string
+type raw []byte
 
 //kanna:value
-type Tags struct{ t tags }
+type Raw struct{ r raw }
 
-func (Tags) validate(tags) error { return nil }
+func (Raw) validate(raw) error { return nil }
 `})
 
 	declared := []string{"x", "v", "err", "y", "data", "src", "json", "slices", "driver", "sql", "errors", "fmt"}
@@ -60,16 +60,16 @@ func (Tags) validate(tags) error { return nil }
 	}
 
 	for _, want := range []string{
-		"func NewTags(v2 tags) (Tags, error) {",
+		"func NewRaw(v2 raw) (Raw, error) {",
 		"v2 = slices2.Clone(v2)",
-		"if err2 := (Tags{}).validate(v2); err2 != nil {",
-		"func (x2 *Tags) UnmarshalJSON(data2 []byte) error {",
+		"if err2 := (Raw{}).validate(v2); err2 != nil {",
+		"func (x2 *Raw) UnmarshalJSON(data2 []byte) error {",
 		"if err2 := json2.Unmarshal(data2, &v2); err2 != nil {",
-		"func (x2 Tags) Value() (driver2.Value, error) {",
-		"func (x2 *Tags) Scan(src2 any) error {",
-		"var v2 sql2.Null[tags]",
+		"func (x2 Raw) Value() (driver2.Value, error) {",
+		"func (x2 *Raw) Scan(src2 any) error {",
+		"var v2 sql2.Null[raw]",
 		"return errors2.New(",
-		"return fmt2.Sprint(x2.t)",
+		"return fmt2.Sprint(x2.r)",
 	} {
 		if !strings.Contains(string(got), want) {
 			t.Errorf("output lacks %q:\n%s", want, got)

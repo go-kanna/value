@@ -1,6 +1,8 @@
 package gen_test
 
 import (
+	"database/sql"
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -214,6 +216,15 @@ func TestGenerated_JSON(t *testing.T) {
 
 func TestGenerated_SQL(t *testing.T) {
 	t.Parallel()
+
+	// database/sql converts no []string, so Tags gets no Value or Scan, which
+	// would fail whatever it held.
+	if _, ok := any(emit.Tags{}).(driver.Valuer); ok {
+		t.Error("Tags has a Value method, want none: database/sql cannot convert a []string")
+	}
+	if _, ok := any(&emit.Tags{}).(sql.Scanner); ok {
+		t.Error("*Tags has a Scan method, want none: database/sql cannot scan into a []string")
+	}
 
 	if v, err := emit.MustCount(3).Value(); err != nil || v != int64(3) {
 		t.Errorf("Value() = %#v, %v; want int64(3), as database/sql converts an int", v, err)

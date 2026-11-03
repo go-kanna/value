@@ -47,6 +47,10 @@ type target struct {
 	// when the value is a slice or a map. The generated code copies it on the
 	// way in and on the way out, so that nobody else holds what was validated.
 	clone string
+
+	// sql reports whether database/sql converts the value both ways, and so
+	// whether Value and Scan are generated.
+	sql bool
 }
 
 // zeroTest is how the generated IsZero tells the zero value.
@@ -120,6 +124,7 @@ func check(fset *token.FileSet, s scan.Struct, d directive.Directive) (target, [
 	t.zero = zeroOf(f.Type)
 	t.hasEqual = hasMethod(f.Type, "Equal", f.Type, types.Typ[types.Bool])
 	t.hasString = hasMethod(f.Type, "String", nil, types.Typ[types.String])
+	t.sql = sqlConverts(f.Type)
 	switch f.Type.Underlying().(type) {
 	case *types.Slice:
 		t.clone = "slices"
@@ -187,7 +192,10 @@ func accessorOf(s scan.Struct, f scan.Field) (string, []diag.Diag) {
 // generatedMethods returns the methods generated on a struct holding a value
 // of type t, besides the accessor.
 func generatedMethods(t types.Type) []string {
-	methods := []string{"MarshalJSON", "UnmarshalJSON", "Value", "Scan"}
+	methods := []string{"MarshalJSON", "UnmarshalJSON"}
+	if sqlConverts(t) {
+		methods = append(methods, "Value", "Scan")
+	}
 	// The accessor of a string is its String method.
 	if !types.Identical(t, types.Typ[types.String]) {
 		methods = append(methods, "String")
@@ -233,6 +241,46 @@ func hasMethod(t types.Type, name string, param, result types.Type) bool {
 		return sig.Params().Len() == 0
 	}
 	return sig.Params().Len() == 1 && types.Identical(sig.Params().At(0).Type(), param)
+}
+
+// sqlConverts reports whether database/sql converts a value of type t both
+// ways, as an argument and as the column scanned into it: a bool, a number that
+// is not complex, a string, a []byte, a time.Time or a uuid.UUID, which it
+// knows, or a type whose value has the method of driver.Valuer and whose
+// pointer has that of sql.Scanner.
+func sqlConverts(t types.Type) bool {
+	if named, ok := types.Unalias(t).(*types.Named); ok && named.Obj().Pkg() != nil {
+		switch named.Obj().Pkg().Path() + "." + named.Obj().Name() {
+		case "time.Time", "uuid.UUID":
+			return true
+		}
+	}
+	switch u := t.Underlying().(type) {
+	case *types.Basic:
+		if u.Info()&(types.IsBoolean|types.IsInteger|types.IsFloat|types.IsString) != 0 && u.Kind() != types.Uintptr {
+			return true
+		}
+	case *types.Slice:
+		if types.Identical(u.Elem(), types.Typ[types.Byte]) {
+			return true
+		}
+	}
+	return valuer(t) && hasMethod(t, "Scan", types.NewInterfaceType(nil, nil), types.Universe.Lookup("error").Type())
+}
+
+// valuer reports whether a value of type t, not only its pointer, has the
+// method of driver.Valuer, Value() (driver.Value, error): database/sql calls it
+// on what it is handed.
+func valuer(t types.Type) bool {
+	obj, _, _ := types.LookupFieldOrMethod(t, false, nil, "Value")
+	fn, ok := obj.(*types.Func)
+	if !ok || fn.Signature().Params().Len() != 0 || fn.Signature().Results().Len() != 2 {
+		return false
+	}
+	results := fn.Signature().Results()
+	v, ok := types.Unalias(results.At(0).Type()).(*types.Named)
+	return ok && v.Obj().Pkg() != nil && v.Obj().Pkg().Path() == "database/sql/driver" && v.Obj().Name() == "Value" &&
+		types.Identical(results.At(1).Type(), types.Universe.Lookup("error").Type())
 }
 
 // checkRule says why s has no validate method that the generated code can

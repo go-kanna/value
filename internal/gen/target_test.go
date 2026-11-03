@@ -1,6 +1,9 @@
 package gen_test
 
 import (
+	"fmt"
+	"go/build"
+	"maps"
 	"slices"
 	"strings"
 	"testing"
@@ -119,22 +122,120 @@ func (x Regenerated) String() string { return "" }
 	})
 
 	want := []string{
-		"CompletedAt{t time.Time} Time() zero=IsZero Equal String NewCompletedAt/MustCompletedAt",
-		"Email{s string} String() zero=compare NewEmail/MustEmail",
-		"price{c cents} Cents() zero=compare newPrice/mustPrice",
-		"Code{b byte} Byte() zero=compare NewCode/MustCode",
-		"Level{l level} Level() zero=compare NewLevel/MustLevel",
+		"CompletedAt{t time.Time} Time() zero=IsZero Equal String SQL NewCompletedAt/MustCompletedAt",
+		"Email{s string} String() zero=compare SQL NewEmail/MustEmail",
+		"price{c cents} Cents() zero=compare SQL newPrice/mustPrice",
+		"Code{b byte} Byte() zero=compare SQL NewCode/MustCode",
+		"Level{l level} Level() zero=compare SQL NewLevel/MustLevel",
 		"Tags{t tags} Tags() zero=nil clone=slices NewTags/MustTags",
 		"Labels{l labels} Labels() zero=nil clone=maps NewLabels/MustLabels",
 		"Address{a address} Address() zero=none NewAddress/MustAddress",
-		"éclair{n int} Int() zero=compare newÉclair/mustÉclair",
-		"Regenerated{n int} Int() zero=compare NewRegenerated/MustRegenerated",
+		"éclair{n int} Int() zero=compare SQL newÉclair/mustÉclair",
+		"Regenerated{n int} Int() zero=compare SQL NewRegenerated/MustRegenerated",
 	}
 	if !slices.Equal(names, want) {
 		t.Errorf("targets = %q, want %q", names, want)
 	}
 	if len(diags) > 0 {
 		t.Errorf("diagnostics = %q, want none", diags)
+	}
+}
+
+// Value and Scan are generated for a value that database/sql converts both
+// ways, and for no other, which is free to have its own.
+func TestTargets_SQL(t *testing.T) {
+	t.Parallel()
+
+	var src strings.Builder
+	src.WriteString(`package test
+
+import (
+	"database/sql/driver"
+	"time"
+)
+
+type (
+	raw    []byte
+	bits   []bit
+	bit    uint8
+	octets [4]byte
+	tags   []string
+	at     time.Time
+	ptr    uintptr
+	wave   complex128
+)
+
+// money converts by methods of its own, which database/sql calls.
+type money struct{ cents int64 }
+
+func (m money) Value() (driver.Value, error) { return m.cents, nil }
+func (m *money) Scan(any) error              { return nil }
+
+// cash has Value on its pointer only, which database/sql does not call on the
+// value it is handed.
+type cash struct{ cents int64 }
+
+func (c *cash) Value() (driver.Value, error) { return c.cents, nil }
+func (c *cash) Scan(any) error               { return nil }
+
+// Notes declares Value and Scan of its own, as none are generated for tags.
+//
+//kanna:value
+type Notes struct{ n tags }
+
+func (Notes) validate(tags) error          { return nil }
+func (Notes) Value() (driver.Value, error) { return nil, nil }
+func (*Notes) Scan(any) error              { return nil }
+`)
+	want := map[string]bool{
+		"bool": true, "uint64": true, "float32": true, "string": true, "time.Time": true, "raw": true, "money": true,
+		"bits": false, "octets": false, "tags": false, "at": false, "ptr": false, "wave": false, "cash": false,
+	}
+	held := slices.Sorted(maps.Keys(want))
+	for i, h := range held {
+		fmt.Fprintf(&src, "\n//kanna:value\ntype V%d struct{ v %s }\n\nfunc (V%d) validate(%s) error { return nil }\n",
+			i, h, i, h)
+	}
+
+	names, diags := targets(t, map[string]string{"model.go": src.String()})
+	if len(diags) > 0 {
+		t.Errorf("diagnostics = %q, want none", diags)
+	}
+	sql := make(map[string]bool, len(names))
+	for _, n := range names {
+		name, _, _ := strings.Cut(n, "{")
+		sql[name] = strings.Contains(n, " SQL ")
+	}
+	for i, h := range held {
+		if got := sql[fmt.Sprintf("V%d", i)]; got != want[h] {
+			t.Errorf("a value of %s: Value and Scan generated = %t, want %t", h, got, want[h])
+		}
+	}
+	if sql["Notes"] {
+		t.Errorf("a value of tags: Value and Scan generated, want none")
+	}
+}
+
+// database/sql knows uuid.UUID, of the standard library from Go 1.27 on, which
+// has no Value or Scan of its own.
+func TestTargets_SQLUUID(t *testing.T) {
+	t.Parallel()
+
+	if !slices.Contains(build.Default.ReleaseTags, "go1.27") {
+		t.Skip("package uuid is in the standard library from Go 1.27 on")
+	}
+	names, diags := targets(t, map[string]string{"model.go": `package test
+
+import "uuid"
+
+//kanna:value
+type ID struct{ u uuid.UUID }
+
+func (ID) validate(uuid.UUID) error { return nil }
+`})
+	if want := []string{"ID{u uuid.UUID} UUID() zero=compare String SQL NewID/MustID"}; !slices.Equal(names, want) ||
+		len(diags) > 0 {
+		t.Errorf("targets = %q, diagnostics %q; want %q", names, diags, want)
 	}
 }
 

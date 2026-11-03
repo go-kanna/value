@@ -243,31 +243,6 @@ func (x *Tags) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Value returns the tags that x holds for a database driver, converted as
-// database/sql converts an argument of tags.
-func (x Tags) Value() (driver.Value, error) {
-	return driver.DefaultParameterConverter.ConvertValue(x.t)
-}
-
-// Scan reads a value of tags from a database column, and keeps it only if the
-// validate method of Tags accepts it. On error x is left as it was. NULL is an
-// error: scan a column that may be NULL into a pointer to Tags.
-func (x *Tags) Scan(src any) error {
-	var v sql.Null[tags]
-	if err := v.Scan(src); err != nil {
-		return err
-	}
-	if !v.Valid {
-		return errors.New("model: cannot scan NULL into Tags; scan a column that may be NULL into *Tags")
-	}
-	y, err := NewTags(v.V)
-	if err != nil {
-		return err
-	}
-	*x = y
-	return nil
-}
-
 // NewPriority returns Priority(v) if v is the value of one of the constants of
 // Priority, and the rule error inclusion otherwise.
 func NewPriority(v string) (Priority, error) {

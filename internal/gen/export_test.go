@@ -19,9 +19,9 @@ var zeroSpellings = map[zeroTest]string{
 
 // Targets finds the targets in pkgs, spelling each as its struct and what the
 // generated code does with the value, such as "CompletedAt{t time.Time} Time()
-// zero=IsZero Equal String NewCompletedAt/MustCompletedAt", where Equal and
-// String are the value's own methods; and spelling each diagnostic as
-// diag.Diag.String does.
+// zero=IsZero Equal String SQL NewCompletedAt/MustCompletedAt", where Equal and
+// String are the value's own methods and SQL says that Value and Scan are
+// generated; and spelling each diagnostic as diag.Diag.String does.
 func Targets(fset *token.FileSet, pkgs []*packages.Package) ([]string, []string) {
 	found, diags := targets(fset, scan.Structs(pkgs))
 
@@ -40,6 +40,9 @@ func Targets(fset *token.FileSet, pkgs []*packages.Package) ([]string, []string)
 		}
 		if t.clone != "" {
 			words = append(words, "clone="+t.clone)
+		}
+		if t.sql {
+			words = append(words, "SQL")
 		}
 		words = append(words, t.newFunc+"/"+t.mustFunc)
 		spelled[i] = strings.Join(words, " ")
