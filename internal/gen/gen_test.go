@@ -514,7 +514,7 @@ func TestCommand_Usage(t *testing.T) {
 		"kanna-value: generate value types from structs marked //kanna:value",
 		"kanna-value [flags] [packages]",
 		"//go:generate go tool kanna-value needs no argument",
-		"-tags string",
+		"-tags tags",
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("usage = %q, want it to contain %q", stdout, want)
