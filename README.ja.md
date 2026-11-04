@@ -55,9 +55,9 @@ func NewEmail(v string) (Email, error)           // checks v with validate
 func MustEmail(v string) Email                   // for a constant: panics if v is rejected
 func (x Email) String() string                   // the string held
 func (x Email) IsZero() bool
-func (x Email) MarshalJSON() ([]byte, error)
+func (x Email) MarshalJSON() ([]byte, error)     // checks what it encodes
 func (x *Email) UnmarshalJSON(data []byte) error // checks what it decodes
-func (x Email) Value() (driver.Value, error)
+func (x Email) Value() (driver.Value, error)     // checks what it writes
 func (x *Email) Scan(src any) error              // checks what it scans
 
 func NewCompletedAt(v time.Time) (CompletedAt, error)
@@ -67,7 +67,7 @@ func (x CompletedAt) Equal(y CompletedAt) bool
 // String, IsZero, MarshalJSON, UnmarshalJSON, Value, and Scan, as for Email
 ```
 
-フィールドは非公開なので、パッケージの外で値を得る手段は `NewEmail`、`MustEmail`、`UnmarshalJSON`、`Scan` だけで、どれも `validate` を実行します。`Email` を受け取るコードは、もう一度チェックする必要がありません。
+フィールドは非公開なので、パッケージの外で値を得る手段は `NewEmail`、`MustEmail`、`UnmarshalJSON`、`Scan` だけで、どれも `validate` を実行します。`Email` を受け取るコードは、もう一度チェックする必要がありません。ただし、`var e Email` のように Go が `validate` を通さずに作るゼロ値は例外です。ゼロ値は `IsZero` で分かります。`MarshalJSON` と `Value` も `validate` を実行するので、ルールが拒否するゼロ値は、読み戻せずに失敗するのではなく、書き出す時点で止まります。値がないことのあるフィールドは、ポインタ（`*Email`。JSON の null と SQL の NULL では nil のまま）にするか、`json:",omitzero"` タグを付けます。
 
 値オブジェクトは独立した型なので、エラーやドキュメントには付けた名前のまま現れ、他の型と同じようにメソッドを定義できます:
 
@@ -108,8 +108,8 @@ $ go generate ./...
 | `String() string` | 値に `String` があればそれを、なければ fmt の `%v` を使う。`string` の場合はアクセサそのもの |
 | `IsZero() bool` | 値に `IsZero` があればそれを、なければゼロ値との `==` を、スライスとマップでは `== nil` を使う |
 | `Equal(y X) bool` | `time.Time` のように `T` が `Equal(T) bool` を持つ場合のみ生成される |
-| `MarshalJSON`, `UnmarshalJSON` | `T` と同じようにエンコードする。`T` としてデコードし、`validate` が受け入れた場合のみ保持する |
-| `Value`, `Scan` | database/sql が `T` を両方向に変換できる場合のみ生成される。database/sql が `T` を変換するのと同じように変換する。`T` としてスキャンし、`validate` が受け入れた場合のみ保持する |
+| `MarshalJSON`, `UnmarshalJSON` | `validate` が受け入れた場合に、`T` と同じようにエンコードする。`T` としてデコードし、`validate` が受け入れた場合のみ保持する |
+| `Value`, `Scan` | database/sql が `T` を両方向に変換できる場合のみ生成される。`validate` が受け入れた場合に、database/sql が `T` を変換するのと同じように変換する。`T` としてスキャンし、`validate` が受け入れた場合のみ保持する |
 
 非公開の構造体には、非公開のコンストラクタ `newX` と `mustX` が生成されます。
 

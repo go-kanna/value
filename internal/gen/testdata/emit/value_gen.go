@@ -56,8 +56,13 @@ func (x CompletedAt) Equal(y CompletedAt) bool {
 	return x.t.Equal(y.t)
 }
 
-// MarshalJSON encodes the time.Time that x holds as encoding/json encodes it.
+// MarshalJSON encodes the time.Time that x holds as encoding/json encodes it,
+// if the validate method of CompletedAt accepts it, so that UnmarshalJSON reads
+// it back: the zero CompletedAt is made without it.
 func (x CompletedAt) MarshalJSON() ([]byte, error) {
+	if err := x.validate(x.t); err != nil {
+		return nil, err
+	}
 	return json.Marshal(x.t)
 }
 
@@ -81,8 +86,13 @@ func (x *CompletedAt) UnmarshalJSON(data []byte) error {
 }
 
 // Value returns the time.Time that x holds for a database driver, converted as
-// database/sql converts an argument of time.Time.
+// database/sql converts an argument of time.Time, if the validate method of
+// CompletedAt accepts it, so that Scan reads it back: the zero CompletedAt is
+// made without it.
 func (x CompletedAt) Value() (driver.Value, error) {
+	if err := x.validate(x.t); err != nil {
+		return nil, err
+	}
 	return driver.DefaultParameterConverter.ConvertValue(x.t)
 }
 
@@ -136,8 +146,13 @@ func (x Email) IsZero() bool {
 	return x == Email{}
 }
 
-// MarshalJSON encodes the string that x holds as encoding/json encodes it.
+// MarshalJSON encodes the string that x holds as encoding/json encodes it, if
+// the validate method of Email accepts it, so that UnmarshalJSON reads it back:
+// the zero Email is made without it.
 func (x Email) MarshalJSON() ([]byte, error) {
+	if err := x.validate(x.s); err != nil {
+		return nil, err
+	}
 	return json.Marshal(x.s)
 }
 
@@ -161,8 +176,12 @@ func (x *Email) UnmarshalJSON(data []byte) error {
 }
 
 // Value returns the string that x holds for a database driver, converted as
-// database/sql converts an argument of string.
+// database/sql converts an argument of string, if the validate method of Email
+// accepts it, so that Scan reads it back: the zero Email is made without it.
 func (x Email) Value() (driver.Value, error) {
+	if err := x.validate(x.s); err != nil {
+		return nil, err
+	}
 	return driver.DefaultParameterConverter.ConvertValue(x.s)
 }
 
@@ -219,8 +238,13 @@ func (x Count) IsZero() bool {
 	return x == Count{}
 }
 
-// MarshalJSON encodes the int that x holds as encoding/json encodes it.
+// MarshalJSON encodes the int that x holds as encoding/json encodes it, if the
+// validate method of Count accepts it, so that UnmarshalJSON reads it back: the
+// zero Count is made without it.
 func (x Count) MarshalJSON() ([]byte, error) {
+	if err := x.validate(x.n); err != nil {
+		return nil, err
+	}
 	return json.Marshal(x.n)
 }
 
@@ -244,8 +268,12 @@ func (x *Count) UnmarshalJSON(data []byte) error {
 }
 
 // Value returns the int that x holds for a database driver, converted as
-// database/sql converts an argument of int.
+// database/sql converts an argument of int, if the validate method of Count
+// accepts it, so that Scan reads it back: the zero Count is made without it.
 func (x Count) Value() (driver.Value, error) {
+	if err := x.validate(x.n); err != nil {
+		return nil, err
+	}
 	return driver.DefaultParameterConverter.ConvertValue(x.n)
 }
 
@@ -303,8 +331,13 @@ func (x price) IsZero() bool {
 	return x == price{}
 }
 
-// MarshalJSON encodes the cents that x holds as encoding/json encodes it.
+// MarshalJSON encodes the cents that x holds as encoding/json encodes it, if
+// the validate method of price accepts it, so that UnmarshalJSON reads it back:
+// the zero price is made without it.
 func (x price) MarshalJSON() ([]byte, error) {
+	if err := x.validate(x.c); err != nil {
+		return nil, err
+	}
 	return json.Marshal(x.c)
 }
 
@@ -328,8 +361,12 @@ func (x *price) UnmarshalJSON(data []byte) error {
 }
 
 // Value returns the cents that x holds for a database driver, converted as
-// database/sql converts an argument of cents.
+// database/sql converts an argument of cents, if the validate method of price
+// accepts it, so that Scan reads it back: the zero price is made without it.
 func (x price) Value() (driver.Value, error) {
+	if err := x.validate(x.c); err != nil {
+		return nil, err
+	}
 	return driver.DefaultParameterConverter.ConvertValue(x.c)
 }
 
@@ -387,8 +424,13 @@ func (x Tags) IsZero() bool {
 	return x.t == nil
 }
 
-// MarshalJSON encodes the tags that x holds as encoding/json encodes it.
+// MarshalJSON encodes the tags that x holds as encoding/json encodes it, if the
+// validate method of Tags accepts it, so that UnmarshalJSON reads it back: the
+// zero Tags is made without it.
 func (x Tags) MarshalJSON() ([]byte, error) {
+	if err := x.validate(x.t); err != nil {
+		return nil, err
+	}
 	return json.Marshal(x.t)
 }
 
@@ -447,8 +489,13 @@ func (x Labels) IsZero() bool {
 	return x.l == nil
 }
 
-// MarshalJSON encodes the labels that x holds as encoding/json encodes it.
+// MarshalJSON encodes the labels that x holds as encoding/json encodes it, if
+// the validate method of Labels accepts it, so that UnmarshalJSON reads it
+// back: the zero Labels is made without it.
 func (x Labels) MarshalJSON() ([]byte, error) {
+	if err := x.validate(x.l); err != nil {
+		return nil, err
+	}
 	return json.Marshal(x.l)
 }
 
@@ -500,8 +547,13 @@ func (x Address) String() string {
 	return fmt.Sprint(x.a)
 }
 
-// MarshalJSON encodes the address that x holds as encoding/json encodes it.
+// MarshalJSON encodes the address that x holds as encoding/json encodes it, if
+// the validate method of Address accepts it, so that UnmarshalJSON reads it
+// back: the zero Address is made without it.
 func (x Address) MarshalJSON() ([]byte, error) {
+	if err := x.validate(x.a); err != nil {
+		return nil, err
+	}
 	return json.Marshal(x.a)
 }
 

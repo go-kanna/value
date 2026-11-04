@@ -171,13 +171,17 @@ func (w writer) writeEqual() {
 func (w writer) writeJSON() {
 	json := w.f.Import("encoding/json", "json")
 
-	x := w.f.Scope().Name("x")
-	w.doc(fmt.Sprintf("MarshalJSON encodes the %s that %s holds as encoding/json encodes it.", w.desc, x))
+	sc := w.f.Scope()
+	x, err := sc.Name("x"), sc.Name("err")
+	w.doc(fmt.Sprintf("MarshalJSON encodes the %s that %s holds as encoding/json encodes it, if the validate "+
+		"method of %s accepts it, so that UnmarshalJSON reads it back: the zero %s is made without it.",
+		w.desc, x, w.Name, w.Name))
 	fmt.Fprintf(w.f, "func (%s %s) MarshalJSON() ([]byte, error) {\n", x, w.Name)
+	w.validated(x, err)
 	fmt.Fprintf(w.f, "return %s.Marshal(%s.%s)\n", json, x, w.field.Name)
 	fmt.Fprintf(w.f, "}\n\n")
 
-	sc := w.f.Scope()
+	sc = w.f.Scope()
 	x, data, v, y, err := sc.Name("x"), sc.Name("data"), sc.Name("v"), sc.Name("y"), sc.Name("err")
 	w.doc(fmt.Sprintf("UnmarshalJSON decodes %s as encoding/json decodes a value of %s, and keeps the value "+
 		"only if the validate method of %s accepts it. JSON null, like an error, leaves %s as it was.",
@@ -197,14 +201,17 @@ func (w writer) writeJSON() {
 func (w writer) writeSQL() {
 	driver := w.f.Import("database/sql/driver", "driver")
 
-	x := w.f.Scope().Name("x")
+	sc := w.f.Scope()
+	x, err := sc.Name("x"), sc.Name("err")
 	w.doc(fmt.Sprintf("Value returns the %s that %s holds for a database driver, converted as "+
-		"database/sql converts an argument of %s.", w.desc, x, w.desc))
+		"database/sql converts an argument of %s, if the validate method of %s accepts it, so that Scan "+
+		"reads it back: the zero %s is made without it.", w.desc, x, w.desc, w.Name, w.Name))
 	fmt.Fprintf(w.f, "func (%s %s) Value() (%s.Value, error) {\n", x, w.Name, driver)
+	w.validated(x, err)
 	fmt.Fprintf(w.f, "return %s.DefaultParameterConverter.ConvertValue(%s.%s)\n", driver, x, w.field.Name)
 	fmt.Fprintf(w.f, "}\n\n")
 
-	sc := w.f.Scope()
+	sc = w.f.Scope()
 	x, src, v, y, err := sc.Name("x"), sc.Name("src"), sc.Name("v"), sc.Name("y"), sc.Name("err")
 	w.doc(fmt.Sprintf("Scan reads a value of %s from a database column, and keeps it only if the validate "+
 		"method of %s accepts it. On error %s is left as it was. NULL is an error: scan a column "+
@@ -220,6 +227,14 @@ func (w writer) writeSQL() {
 	fmt.Fprintf(w.f, "}\n")
 	keep(w.f, w.newFunc, x, y, err, v+".V")
 	fmt.Fprintf(w.f, "}\n\n")
+}
+
+// validated starts a method writing out the value x holds: it returns err,
+// with nothing written, unless the validate method accepts the value.
+func (w writer) validated(x, err string) {
+	fmt.Fprintf(w.f, "if %s := %s.validate(%s.%s); %s != nil {\n", err, x, x, w.field.Name, err)
+	fmt.Fprintf(w.f, "return nil, %s\n", err)
+	fmt.Fprintf(w.f, "}\n")
 }
 
 // doc writes text as a comment.
