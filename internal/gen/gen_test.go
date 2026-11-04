@@ -358,7 +358,7 @@ func TestCommand_Failures(t *testing.T) {
 		{
 			name:  "directive with arguments",
 			files: map[string]string{"app.go": strings.Replace(appSrc, "//kanna:value", "//kanna:value strict", 1)},
-			want:  "./app.go:9:1: error: //kanna:value takes no arguments, got \"strict\"\n",
+			want:  "./app.go:9:1: error: //kanna:value takes no argument, not \"strict\"\n",
 		},
 		{
 			name:  "type error elsewhere",

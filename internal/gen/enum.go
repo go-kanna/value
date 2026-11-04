@@ -79,10 +79,7 @@ func enums(fset *token.FileSet, decls []scan.Type) ([]enum, []diag.Diag) {
 
 // checkEnum works out the enum t, marked by d, and says why it cannot be one.
 func checkEnum(fset *token.FileSet, t scan.Type, d directive.Directive) (enum, []diag.Diag) {
-	var diags []diag.Diag
-	if d.Args != "" {
-		diags = append(diags, diag.Errorf(d.Pos, "//kanna:%s takes no arguments, got %q", enumKey, d.Args))
-	}
+	_, diags := d.Parse(directive.Spec{})
 
 	if t.Named.TypeParams().Len() > 0 {
 		return enum{}, append(diags, diag.Errorf(t.Pos, "generic type %s is not supported", t.Name))

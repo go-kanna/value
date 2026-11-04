@@ -96,10 +96,7 @@ func targets(fset *token.FileSet, structs []scan.Struct) ([]target, []diag.Diag)
 
 // check works out the target s, marked by d, and says why it cannot be one.
 func check(fset *token.FileSet, s scan.Struct, d directive.Directive) (target, []diag.Diag) {
-	var diags []diag.Diag
-	if d.Args != "" {
-		diags = append(diags, diag.Errorf(d.Pos, "//kanna:%s takes no arguments, got %q", directiveKey, d.Args))
-	}
+	_, diags := d.Parse(directive.Spec{})
 
 	// A method on a generic type would need its type parameters, and its rule
 	// could not be checked until it is instantiated.
