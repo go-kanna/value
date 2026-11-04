@@ -58,9 +58,9 @@ func NewEmail(v string) (Email, error)           // checks v with validate
 func MustEmail(v string) Email                   // for a constant: panics if v is rejected
 func (x Email) String() string                   // the string held
 func (x Email) IsZero() bool
-func (x Email) MarshalJSON() ([]byte, error)
+func (x Email) MarshalJSON() ([]byte, error)     // checks what it encodes
 func (x *Email) UnmarshalJSON(data []byte) error // checks what it decodes
-func (x Email) Value() (driver.Value, error)
+func (x Email) Value() (driver.Value, error)     // checks what it writes
 func (x *Email) Scan(src any) error              // checks what it scans
 
 func NewCompletedAt(v time.Time) (CompletedAt, error)
@@ -71,7 +71,10 @@ func (x CompletedAt) Equal(y CompletedAt) bool
 ```
 
 The field is unexported, so outside the package a value comes only from `NewEmail`, `MustEmail`, `UnmarshalJSON`, or
-`Scan`, and each of them runs `validate`. Code receiving an `Email` need not check it again.
+`Scan`, and each of them runs `validate`. Code receiving an `Email` need not check it again, but for the zero value,
+which Go makes without it, as in `var e Email`. `IsZero` tells it, and `MarshalJSON` and `Value` run `validate` as well,
+so a zero value the rule rejects stops where it is written out, rather than where it fails to read back. A field that
+may hold no value is a pointer, `*Email`, which JSON null and SQL NULL leave nil, or is tagged `json:",omitzero"`.
 
 A value type is a type of its own, named as you named it in errors and documentation, and it takes methods like any
 other:
@@ -116,8 +119,8 @@ For a struct `X` holding a value of type `T` in its field `t`:
 | `String() string`                              | the value's own `String` if it has one, or else fmt's `%v`; for a `string`, the accessor itself                                  |
 | `IsZero() bool`                                | the value's own `IsZero` if it has one, or else `==` with the zero value, or `== nil` for a slice or a map                       |
 | `Equal(y X) bool`                              | only when `T` has `Equal(T) bool`, as `time.Time` does                                                                           |
-| `MarshalJSON`, `UnmarshalJSON`                 | encode the value as `T` encodes; decode a `T` and keep it only if `validate` accepts it                                          |
-| `Value`, `Scan`                                | only when database/sql converts a `T` both ways; convert the value as it converts a `T`; scan a `T` and keep it only if `validate` accepts it |
+| `MarshalJSON`, `UnmarshalJSON`                 | encode the value as `T` encodes, if `validate` accepts it; decode a `T` and keep it only if `validate` accepts it                 |
+| `Value`, `Scan`                                | only when database/sql converts a `T` both ways; convert the value as it converts a `T`, if `validate` accepts it; scan a `T` and keep it only if `validate` accepts it |
 
 An unexported struct gets unexported constructors, `newX` and `mustX`.
 

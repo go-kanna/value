@@ -212,6 +212,14 @@ func TestGenerated_JSON(t *testing.T) {
 	if err := kept.UnmarshalJSON([]byte("null")); err != nil || kept.String() != "kept@example.com" {
 		t.Errorf("UnmarshalJSON(null) = %v, leaving %v; want nil, leaving it as it was", err, kept)
 	}
+
+	// The zero value is made without the rule, which may reject it: written
+	// out, it would not read back.
+	_, err = json.Marshal(emit.Email{})
+	wantCode(t, err, "email")
+	if b, err := json.Marshal(emit.Count{}); err != nil || string(b) != "0" {
+		t.Errorf("Marshal(Count{}) = %s, %v; want 0, which the rule accepts", b, err)
+	}
 }
 
 func TestGenerated_SQL(t *testing.T) {
@@ -229,6 +237,11 @@ func TestGenerated_SQL(t *testing.T) {
 	if v, err := emit.MustCount(3).Value(); err != nil || v != int64(3) {
 		t.Errorf("Value() = %#v, %v; want int64(3), as database/sql converts an int", v, err)
 	}
+	if v, err := (emit.Count{}).Value(); err != nil || v != int64(0) {
+		t.Errorf("Count{}.Value() = %#v, %v; want int64(0), which the rule accepts", v, err)
+	}
+	_, err := (emit.CompletedAt{}).Value()
+	wantCode(t, err, "greater_than_or_equal_to")
 
 	var at emit.CompletedAt
 	if err := at.Scan(valid); err != nil || !at.Time().Equal(valid) {
