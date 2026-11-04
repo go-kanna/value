@@ -167,7 +167,8 @@ const (
 )
 `,
 			want: `test.go:8:2: error: StatusCancelled holds "canceled", as StatusCanceled does` + "\n" +
-				"  give each constant a value of its own",
+				"  give each constant a value of its own\n" +
+				"  or, to name StatusCanceled otherwise, declare func StatusCancelled() Status instead",
 		},
 		{
 			name: "hand-written generated method",

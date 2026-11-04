@@ -159,6 +159,12 @@ func (x OrderStatus) Validate() error                  // whether x is the value
 
 型は定数を持つ string 型のままなので、定数に対する `switch`、switch の網羅性を調べる linter、定数を読み取る他のジェネレータは、これまでどおり動きます。値をエンコードするコードは生成されません。encoding/json も database/sql も、もともと string としてそのまま送るからです。生成されたコードがチェックするのは外部から来る値です。プログラム内では、他の string 型と同じく `OrderStatus("shiped")` もコンパイルが通るので、値は定数か `NewOrderStatus` で作ってください。そのどちらからも作られなかった値は `Validate` で検出できます。ゼロ値も定数ではないので拒否されます。値がない場合があるなら `*OrderStatus` を使ってください。
 
+定数 1 つが enum の値 1 つで、enum を読む生成器はそれを 1 つずつ扱います。そのため、同じ値を持つ 2 つの定数は、コピーの誤りと同じく生成を止めます。既定値のように、ある値に別の名前を付けたいときは、関数で書きます:
+
+```go
+func DefaultOrderStatus() OrderStatus { return OrderStatusPlaced }
+```
+
 生成できない enum は、生成を止めます:
 
 ```console
@@ -167,6 +173,7 @@ $ go generate ./...
   declare them beside it, such as const OrderStatusA OrderStatus = "a"
 ./order.go:12:2: error: OrderStatusSettled holds "paid", as OrderStatusPaid does
   give each constant a value of its own
+  or, to name OrderStatusPaid otherwise, declare func OrderStatusSettled() OrderStatus instead
 ./order.go:13:2: error: OrderStatusNone holds "", the zero value of OrderStatus, which stands for none
   remove it, and use a *OrderStatus where a value may be absent
 ./order.go:20:6: error: Kind is not a struct, which //kanna:value marks

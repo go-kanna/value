@@ -191,6 +191,14 @@ program, `OrderStatus("shiped")` compiles as for any string type, so make values
 `NewOrderStatus`. `Validate` catches a value that did not come from either, and the zero value, which is no constant
 either: use a `*OrderStatus` where a value may be absent.
 
+Each constant is one value of the enum, which the generators reading it take one by one, so two constants holding one
+value stop generation, as a mistake in copying one would. Give a value another name, such as a default, with a
+function instead:
+
+```go
+func DefaultOrderStatus() OrderStatus { return OrderStatusPlaced }
+```
+
 An enum that cannot be generated stops generation:
 
 ```console
@@ -199,6 +207,7 @@ $ go generate ./...
   declare them beside it, such as const OrderStatusA OrderStatus = "a"
 ./order.go:12:2: error: OrderStatusSettled holds "paid", as OrderStatusPaid does
   give each constant a value of its own
+  or, to name OrderStatusPaid otherwise, declare func OrderStatusSettled() OrderStatus instead
 ./order.go:13:2: error: OrderStatusNone holds "", the zero value of OrderStatus, which stands for none
   remove it, and use a *OrderStatus where a value may be absent
 ./order.go:20:6: error: Kind is not a struct, which //kanna:value marks
