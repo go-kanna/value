@@ -358,7 +358,7 @@ func TestCommand_Failures(t *testing.T) {
 		{
 			name:  "directive with arguments",
 			files: map[string]string{"app.go": strings.Replace(appSrc, "//kanna:value", "//kanna:value strict", 1)},
-			want:  "./app.go:9:1: error: //kanna:value takes no arguments, got \"strict\"\n",
+			want:  "./app.go:9:1: error: //kanna:value takes no argument, not \"strict\"\n",
 		},
 		{
 			name:  "type error elsewhere",
@@ -408,6 +408,28 @@ type Phone struct{ s string }
 	code, _, stderr := run(t, dir)
 	if want := "./app.go:19:1: warning: \"//kanna:valeu\" is not recognized as a directive\n" +
 		"  did you mean \"//kanna:value\"?\n"; code != cli.ExitOK ||
+		!strings.Contains(stderr, want) {
+		t.Errorf("run = %d, stderr %q; want success with %q", code, stderr, want)
+	}
+}
+
+// A directive a blank line keeps from its type marks nothing, which is told at
+// the line.
+func TestCommand_WarnsOfALooseDirective(t *testing.T) {
+	t.Parallel()
+
+	src := appSrc + `
+//kanna:enum
+
+type Plan string
+
+const PlanFree Plan = "free"
+`
+	dir := writeModule(t, map[string]string{"app.go": src})
+
+	code, _, stderr := run(t, dir)
+	if want := "./app.go:19:1: warning: //kanna:enum is not attached to a declaration, so nothing reads it\n" +
+		"  write it right above what it marks, with no blank line between\n"; code != cli.ExitOK ||
 		!strings.Contains(stderr, want) {
 		t.Errorf("run = %d, stderr %q; want success with %q", code, stderr, want)
 	}

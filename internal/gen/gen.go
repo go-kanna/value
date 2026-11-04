@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-kanna/internal/cli"
 	"github.com/go-kanna/internal/diag"
+	"github.com/go-kanna/internal/directive"
 	"github.com/go-kanna/internal/output"
 	"github.com/go-kanna/internal/packages"
 	"github.com/go-kanna/internal/scan"
@@ -103,7 +104,11 @@ func written(set packages.Set) map[string]bool {
 func generate(set packages.Set) ([]output.Change, []diag.Diag) {
 	found, diags := targets(set.Fset, scan.Structs(set.Packages))
 	marked, ds := enums(set.Fset, scan.Types(set.Packages))
-	if diags = append(diags, ds...); diag.HasErrors(diags) {
+	diags = append(diags, ds...)
+	for _, pkg := range set.Packages {
+		diags = append(diags, directive.Loose(directive.Lines(set.Fset, pkg.Syntax), directiveKey, enumKey)...)
+	}
+	if diag.HasErrors(diags) {
 		return nil, diags
 	}
 

@@ -90,6 +90,8 @@ $ go generate ./...
   declare a named type for it, and hold that
 ./model.go:21:1: warning: "//kanna:valeu" is not recognized as a directive
   did you mean "//kanna:value"?
+./model.go:25:1: warning: //kanna:enum is not attached to a declaration, so nothing reads it
+  write it right above what it marks, with no blank line between
 ```
 
 生成されるものは、生成前から呼び出していても構いません。型を kanna-value に移行するときや、呼び出し側を先に書くときなどです。kanna-value は読み込んだパッケージを、これから書き出す内容を組み込んだ状態でもう一度型チェックし、コンパイルが通らない間は何も書き出しません。コンストラクタがないために隠れていた間違い、たとえば値オブジェクトにないメソッドの呼び出しも、このとき報告されます。

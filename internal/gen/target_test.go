@@ -265,7 +265,7 @@ type Email struct{ s string }
 
 func (Email) validate(string) error { return nil }
 `,
-			want: `test.go:3:1: error: //kanna:value takes no arguments, got "strict"`,
+			want: `test.go:3:1: error: //kanna:value takes no argument, not "strict"`,
 		},
 		{
 			name: "generic",

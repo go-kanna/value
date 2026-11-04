@@ -104,7 +104,7 @@ type Status string
 
 const StatusA Status = "a"
 `,
-			want: `test.go:3:1: error: //kanna:enum takes no arguments, got "strict"`,
+			want: `test.go:3:1: error: //kanna:enum takes no argument, not "strict"`,
 		},
 		{
 			name: "generic",
