@@ -98,6 +98,8 @@ $ go generate ./...
   declare a named type for it, and hold that
 ./model.go:21:1: warning: "//kanna:valeu" is not recognized as a directive
   did you mean "//kanna:value"?
+./model.go:25:1: warning: //kanna:enum is not attached to a declaration, so nothing reads it
+  write it right above what it marks, with no blank line between
 ```
 
 Code may call what is generated before it exists, as when a type moves to kanna-value or its callers are written
