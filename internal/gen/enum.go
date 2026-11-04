@@ -1,6 +1,7 @@
 package gen
 
 import (
+	"fmt"
 	"go/constant"
 	"go/token"
 	"go/types"
@@ -116,8 +117,11 @@ func checkEnum(fset *token.FileSet, t scan.Type, d directive.Directive) (enum, [
 			diags = append(diags, diag.Errorf(pos, `%s holds "", the zero value of %s, which stands for none`, c.Name(), t.Name).
 				WithHints("remove it, and use a *"+t.Name+" where a value may be absent"))
 		case ok:
+			// Each constant is a value of the enum, as every generator reading
+			// it takes them one by one: another name for one is no constant.
 			diags = append(diags, diag.Errorf(pos, "%s holds %q, as %s does", c.Name(), v, first).
-				WithHints("give each constant a value of its own"))
+				WithHints("give each constant a value of its own",
+					fmt.Sprintf("or, to name %s otherwise, declare func %s() %s instead", first, c.Name(), t.Name)))
 		default:
 			held[v] = c.Name()
 		}
