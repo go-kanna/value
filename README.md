@@ -191,7 +191,8 @@ other generators reading the constants work as before. Nothing is generated to e
 database/sql already send it as the string it is. What the generated code checks is what comes from outside: within the
 program, `OrderStatus("shiped")` compiles as for any string type, so make values with the constants or with
 `NewOrderStatus`. `Validate` catches a value that did not come from either, and the zero value, which is no constant
-either: use a `*OrderStatus` where a value may be absent.
+either: use a `*OrderStatus` where a value may be absent. [`kanna-value vet`](#checking-the-constants-given-to-an-enum)
+finds a constant such as `"shiped"` before the program runs.
 
 Each constant is one value of the enum, which the generators reading it take one by one, so two constants holding one
 value stop generation, as a mistake in copying one would. Give a value another name, such as a default, with a
@@ -217,6 +218,40 @@ $ go generate ./...
 ```
 
 An unexported enum gets unexported functions, `newX` and `xValues`.
+
+## Checking the constants given to an enum
+
+An enum stays a string type, so Go makes a value of it from any string constant, whether or not one of its constants
+holds that value. `o.Status == "shiped"` compiles, and matches no value the enum declares; `o.Status = "shiped"`
+compiles, and sets a value that `Validate` rejects, which database/sql writes as it is and `Scan` refuses to read back.
+`kanna-value vet` finds such constants without running them:
+
+```sh
+go tool kanna-value vet ./...
+```
+
+```text
+usecase/orders.go:42:17: error: "shiped" is none of the constants of model.OrderStatus
+  did you mean model.OrderStatusShipped?
+```
+
+It reports a string constant that none of an enum's constants holds, where the program makes a value of the enum from
+it: compared with `==` or `!=`, in a `case`, assigned, passed, returned, put in a composite literal, converted, or
+declared as a constant of the enum's type in a function or in another package. A constant so declared is reported
+where its value is written, not where it is used. It also reports a constant given to the enum's generated
+`NewOrderStatus`, which rejects it every time, the empty string included. It leaves alone:
+
+- the constants of the enum's type declared at the top level of its package, which are what its values are;
+- the empty string, the zero value, made a value of the enum, as a program may write it to tell or to reset a value
+  unset;
+- a constant ordered against a value of the enum, with `<` or the like, or joined to one with `+` or `+=`, which need
+  not be one of its values;
+- a value made at run time, such as `OrderStatus(s)`.
+
+An enum is a string type marked `//kanna:enum`, in the packages checked or in any they import: vet reads those from
+source to tell one, but reports in the packages it is given alone. Test files are not checked, as a test may make a
+value the enum rejects on purpose. A package that passes holds no constant vet found to be none of an enum's; that is
+not to say there is none.
 
 ## Rules
 
@@ -300,7 +335,10 @@ linters:
 
 ```sh
 kanna-value [flags] [packages]
+kanna-value vet [flags] [packages]
 ```
+
+Generating:
 
 | Flag            | Meaning                                                                                      |
 |-----------------|----------------------------------------------------------------------------------------------|
@@ -309,6 +347,13 @@ kanna-value [flags] [packages]
 | `-v`            | list the files written, removed, or left unchanged                                           |
 | `-deps`         | print what a run reads and writes as JSON, for the `kanna` command, and exit                 |
 | `-version`      | print the version                                                                            |
+
+Vetting:
+
+| Flag           | Meaning                    |
+|----------------|----------------------------|
+| `-tags <list>` | comma-separated build tags |
+| `-version`     | print the version          |
 
 The packages default to the one in the current directory, so `//go:generate go tool kanna-value` needs no argument. A
 run that succeeds prints nothing but its warnings. One of them is about the run itself: when nothing in its packages is
@@ -330,15 +375,15 @@ package's files before it runs the generators; the file is gone as it should be
 
 [`example`](example) builds the values of a task service from constants and from input, decodes requests holding them
 — one valid, one with too many tags, one completed before the service began, one with a priority that is none of its
-enum's constants — and shows that a slice it was given cannot be changed from outside. CI regenerates it and fails if the
-output would change.
+enum's constants — and shows that a slice it was given cannot be changed from outside. CI regenerates it, checks it with
+`kanna-value vet`, and fails if the output would change or vet reports a constant.
 
 ## Development
 
 ```sh
 make test       # unit tests
 make lint       # golangci-lint
-make example    # regenerate the example, then build and run it
+make example    # regenerate the example, vet it, and run it
 ```
 
 ## License
