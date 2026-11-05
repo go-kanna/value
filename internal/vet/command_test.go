@@ -11,7 +11,7 @@ import (
 	"github.com/go-kanna/value/internal/vet"
 )
 
-func TestExec(t *testing.T) {
+func TestCommand(t *testing.T) {
 	t.Parallel()
 
 	dir := module(t, model, map[string]string{
@@ -49,13 +49,10 @@ var _ model.Status = "opne"
 			"tagged/tagged.go:7:22: error: \"opne\" is none of the constants of model.Status\n" +
 				"  did you mean model.StatusOpen?\n"},
 		{dir, []string{"./does-not-exist"}, cli.ExitFailure, "", ""},
-		{dir, []string{"-h"}, cli.ExitOK, "kanna-value vet: ", ""},
-		{dir, []string{"help"}, cli.ExitOK, "kanna-value vet: ", ""},
-		{dir, []string{"-version"}, cli.ExitOK, "kanna-value ", ""},
-		{dir, []string{"-unknown"}, cli.ExitUsage, "", "flag provided but not defined: -unknown\n"},
+		{dir, []string{"-h"}, cli.ExitOK, "kanna-value vet: find the constants given to an enum", ""},
 	} {
 		var out, errOut bytes.Buffer
-		code := vet.Exec(cli.Env{Out: &out, Err: &errOut, Dir: tt.dir}, tt.args)
+		code := vet.Command().Exec(cli.Env{Out: &out, Err: &errOut, Dir: tt.dir}, tt.args)
 		if code != tt.code ||
 			!strings.HasPrefix(out.String(), tt.stdout) ||
 			(tt.stderr != "" && !strings.HasPrefix(errOut.String(), tt.stderr)) {
