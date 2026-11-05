@@ -159,7 +159,7 @@ func (x OrderStatus) Validate() error                  // whether x is the value
 
 コンストラクタ、デコード、スキャン、検証のメソッドは、どの定数でもない値を `rule.Fail("inclusion")` で拒否し（kanna-validate の `oneof` が報告するのと同じコードです）、値を変更しません。NULL のカラムは、値オブジェクトと同じくエラーになります。
 
-型は定数を持つ string 型のままなので、定数に対する `switch`、switch の網羅性を調べる linter、定数を読み取る他のジェネレータは、これまでどおり動きます。値をエンコードするコードは生成されません。encoding/json も database/sql も、もともと string としてそのまま送るからです。生成されたコードがチェックするのは外部から来る値です。プログラム内では、他の string 型と同じく `OrderStatus("shiped")` もコンパイルが通るので、値は定数か `NewOrderStatus` で作ってください。そのどちらからも作られなかった値は `Validate` で検出できます。ゼロ値も定数ではないので拒否されます。値がない場合があるなら `*OrderStatus` を使ってください。
+型は定数を持つ string 型のままなので、定数に対する `switch`、switch の網羅性を調べる linter、定数を読み取る他のジェネレータは、これまでどおり動きます。値をエンコードするコードは生成されません。encoding/json も database/sql も、もともと string としてそのまま送るからです。生成されたコードがチェックするのは外部から来る値です。プログラム内では、他の string 型と同じく `OrderStatus("shiped")` もコンパイルが通るので、値は定数か `NewOrderStatus` で作ってください。そのどちらからも作られなかった値は `Validate` で検出できます。ゼロ値も定数ではないので拒否されます。値がない場合があるなら `*OrderStatus` を使ってください。`"shiped"` のような定数は、[`kanna-value vet`](#enum-に渡す定数を検査する) がプログラムを動かす前に見つけます。
 
 定数 1 つが enum の値 1 つで、enum を読む生成器はそれを 1 つずつ扱います。そのため、同じ値を持つ 2 つの定数は、コピーの誤りと同じく生成を止めます。既定値のように、ある値に別の名前を付けたいときは、関数で書きます:
 
@@ -183,6 +183,28 @@ $ go generate ./...
 ```
 
 非公開の enum には、非公開の関数 `newX` と `xValues` が生成されます。
+
+## enum に渡す定数を検査する
+
+enum は string 型のままなので、Go はどの文字列の定数からでも enum の値を作ります。その値を持つ定数があるかどうかは問いません。`o.Status == "shiped"` はコンパイルが通りますが、enum が宣言したどの値にも一致しません。`o.Status = "shiped"` もコンパイルが通りますが、`Validate` が拒否する値を入れます。database/sql はその値をそのまま書き込み、読み戻すときに `Scan` が拒否します。`kanna-value vet` は、このような定数を、動かさずに見つけます:
+
+```sh
+go tool kanna-value vet ./...
+```
+
+```text
+usecase/orders.go:42:17: error: "shiped" is none of the constants of model.OrderStatus
+  did you mean model.OrderStatusShipped?
+```
+
+報告するのは、enum のどの定数も持たない文字列の定数で、プログラムがそこから enum の値を作るところです。`==` や `!=` での比較、`case`、代入、引数、戻り値、複合リテラル、変換、関数の中や別のパッケージでの enum の型の定数の宣言が対象です。そうして宣言した定数は、使う場所ではなく、値を書いた場所で報告します。enum に生成された `NewOrderStatus` に渡す定数も報告します。こちらは毎回拒否されるので、空文字列も含みます。次のものは報告しません:
+
+- enum のパッケージの最上位で宣言した、enum の型の定数。これが enum の値そのものです
+- enum の値にする空文字列。ゼロ値で、値が未設定であることを調べたり、未設定に戻したりするために書くことがあります
+- `<` などで enum の値と大小を比べる定数や、`+` や `+=` で enum の値につなげる定数。enum の値である必要はありません
+- `OrderStatus(s)` のように、実行時に作る値
+
+enum とは、`//kanna:enum` の印が付いた string 型です。検査するパッケージにあっても、それが import するパッケージにあってもかまいません。vet は enum を見分けるためにそれらをソースから読みますが、報告するのは指定したパッケージだけです。テストのファイルは検査しません。テストでは、enum が拒否する値をわざと作ることがあるからです。検査を通ったパッケージは、vet が見つけた誤りがないというだけで、誤りがないことの証明ではありません。
 
 ## ルール
 
@@ -253,7 +275,10 @@ linters:
 
 ```sh
 kanna-value [flags] [packages]
+kanna-value vet [flags] [packages]
 ```
+
+生成:
 
 | フラグ | 意味 |
 |---|---|
@@ -261,6 +286,13 @@ kanna-value [flags] [packages]
 | `-check` | 書き出す代わりに、出力が最新であることを検証する。不要な出力が残っていないことも含む。`KANNA_CHECK=1` でも同じ |
 | `-v` | 書き出した、削除した、変更しなかったファイルを一覧表示する |
 | `-deps` | 実行が読み書きするものを、`kanna` コマンドのために JSON で表示して終了する |
+| `-version` | バージョンを表示する |
+
+検査:
+
+| フラグ | 意味 |
+|---|---|
+| `-tags <list>` | カンマ区切りのビルドタグ |
 | `-version` | バージョンを表示する |
 
 パッケージのデフォルトはカレントディレクトリのパッケージなので、`//go:generate go tool kanna-value` に引数は不要です。成功した実行は、警告以外何も出力しません。警告の 1 つは実行そのものについてのものです。対象のパッケージに `//kanna:value` も `//kanna:enum` もない場合、残っている `//go:generate` の行は無害なので実行は成功しますが、その行も消すつもりだった可能性が高いので、そのことを知らせます:
@@ -274,14 +306,14 @@ warning: nothing is marked //kanna:value or //kanna:enum in example.com/app/mode
 
 ## サンプル
 
-[`example`](example) は、タスクサービスの値を定数と入力から作り、それらを持つリクエストをデコードします。リクエストは、有効なもの、タグが多すぎるもの、サービス開始より前に完了したもの、enum のどの定数でもない優先度を持つものの 4 つです。さらに、渡したスライスを外部から変更できないことも示します。CI はこれを再生成し、出力が変わる場合は失敗します。
+[`example`](example) は、タスクサービスの値を定数と入力から作り、それらを持つリクエストをデコードします。リクエストは、有効なもの、タグが多すぎるもの、サービス開始より前に完了したもの、enum のどの定数でもない優先度を持つものの 4 つです。さらに、渡したスライスを外部から変更できないことも示します。CI はこれを再生成して `kanna-value vet` で検査し、出力が変わる場合や vet が定数を報告した場合は失敗します。
 
 ## 開発
 
 ```sh
 make test       # unit tests
 make lint       # golangci-lint
-make example    # regenerate the example, then build and run it
+make example    # regenerate the example, vet it, and run it
 ```
 
 ## ライセンス

@@ -29,7 +29,9 @@ func Command() cli.Command[config] {
 			", and enums from string types marked //kanna:" + enumKey,
 		Args: "[packages]",
 		Help: "The packages default to the one in the current directory, so that\n" +
-			"//go:generate go tool " + generator + " needs no argument.",
+			"//go:generate go tool " + generator + " needs no argument.\n\n" +
+			generator + " vet [flags] [packages] finds the constants given to an enum that are\n" +
+			"none of its constants; " + generator + " vet -h tells more.",
 		Flags: func(fs *flag.FlagSet, cfg *config) {
 			cli.Tags(fs, &cfg.tags)
 		},
