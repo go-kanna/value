@@ -120,7 +120,7 @@ $ go generate ./...
 - `T` は基本型か名前付き型で、その名前からアクセサの名前が決まります。スライスは `type tags []string` のように独自の型を通して保持します。
 - スライスとマップは、受け取るときと返すときに `slices.Clone` または `maps.Clone` でコピーされるので、`validate` を通った後に変更されることはありません。ただし、要素の中身まではコピーされず、構造体の中のスライスもコピーされません。その場で変更されない値を保持してください。
 - `IsZero` は Go と同じ基準でゼロ値を判定します。nil スライスはゼロ値ですが、空のスライスは違います。`==` でも `== nil` でも独自のメソッドでもゼロ値を判定できない `T`（スライスを持つ構造体など）には `IsZero` が生成されず、encoding/json の `omitzero` はリフレクションにフォールバックします。
-- ゼロを渡すことと何も渡さないことは区別されません。価格の 0 のようにルールがゼロ値を受け入れる場合、`MustPrice(0)` は `Price{}` と等しく、`IsZero` はどちらもゼロと判定し、`omitzero` はどちらも省略し、kanna-validate の `required` はどちらも `blank` と報告します。ゼロという値と値がないことを区別したい場合は、`*Price` で保持し、値がないときは nil にしてください。
+- ゼロを渡すことと何も渡さないことは区別されません。価格の 0 のようにルールがゼロ値を受け入れる場合、`MustPrice(0)` は `Price{}` と等しく、`IsZero` はどちらもゼロと判定し、`omitzero` はどちらも省略し、kanna-validator の `required` はどちらも `blank` と報告します。ゼロという値と値がないことを区別したい場合は、`*Price` で保持し、値がないときは nil にしてください。
 - `Equal` があるのは、時刻では `==` が正しく判定できないことがあるからです。同じ時刻でも、片方がモノトニッククロックの読み取り値を持っていたり、ロケーションが異なっていたりすると `==` では異なるものになります。データベースから読み戻した時刻がこれにあたります。
 - database/sql が `T` を両方向に変換できるのは、`T` が bool、複素数以外の数値、文字列、`[]byte`、`time.Time`、`uuid.UUID` の場合と、`T` の値が `Value() (driver.Value, error)` を、ポインタが `Scan(any) error` を持つ場合です。`type tags []string` のようなそれ以外の `T` には、`Value` と `Scan` を生成しません。生成しても、どの値でも失敗するからです。保存したい場合は、自分で書いてください。
 
@@ -152,12 +152,12 @@ func OrderStatusValues() []OrderStatus                 // the constants in the o
 func (x OrderStatus) String() string                   // the underlying string; implements fmt.Stringer
 func (x *OrderStatus) UnmarshalText(text []byte) error // what encoding/json decodes a string or an object key with
 func (x *OrderStatus) Scan(src any) error
-func (x OrderStatus) Validate() error                  // whether x is the value of a constant, which kanna-validate calls
+func (x OrderStatus) Validate() error                  // whether x is the value of a constant, which kanna-validator calls
 ```
 
 `String` は検証せずに元の文字列を返します。ゼロ値や、直接キャストした未検証の値でも同じです。他の生成メソッドと同じく、手書きの `String` メソッドがある場合は削除してから生成してください。
 
-コンストラクタ、デコード、スキャン、検証のメソッドは、どの定数でもない値を `rule.Fail("inclusion")` で拒否し（kanna-validate の `oneof` が報告するのと同じコードです）、値を変更しません。NULL のカラムは、値オブジェクトと同じくエラーになります。
+コンストラクタ、デコード、スキャン、検証のメソッドは、どの定数でもない値を `rule.Fail("inclusion")` で拒否し（kanna-validator の `oneof` が報告するのと同じコードです）、値を変更しません。NULL のカラムは、値オブジェクトと同じくエラーになります。
 
 型は定数を持つ string 型のままなので、定数に対する `switch`、switch の網羅性を調べる linter、定数を読み取る他のジェネレータは、これまでどおり動きます。値をエンコードするコードは生成されません。encoding/json も database/sql も、もともと string としてそのまま送るからです。生成されたコードがチェックするのは外部から来る値です。プログラム内では、他の string 型と同じく `OrderStatus("shiped")` もコンパイルが通るので、値は定数か `NewOrderStatus` で作ってください。そのどちらからも作られなかった値は `Validate` で検出できます。ゼロ値も定数ではないので拒否されます。値がない場合があるなら `*OrderStatus` を使ってください。`"shiped"` のような定数は、[`kanna-value vet`](#enum-に渡す定数を検査する) がプログラムを動かす前に見つけます。
 
@@ -231,7 +231,7 @@ func (CompanyEmail) validate(s string) error {
 }
 ```
 
-コードは破られたルールの名前で、翻訳メッセージや API レスポンスのキーに使えるほど安定した形式です。パラメータはメッセージに必要な情報を運びます。kanna-validate は `count` 付きの `too_long` のように Rails の ActiveModel::Validations のコードを報告するので、独自のルールでも同じコードを使うと API のエラーがそろいます。エラーは `rule: too_long (count=3)` のような形式になります。拒否された値は決して含まれません。エラーはログに残るものであり、値は個人情報かもしれないからです。
+コードは破られたルールの名前で、翻訳メッセージや API レスポンスのキーに使えるほど安定した形式です。パラメータはメッセージに必要な情報を運びます。kanna-validator は `count` 付きの `too_long` のように Rails の ActiveModel::Validations のコードを報告するので、独自のルールでも同じコードを使うと API のエラーがそろいます。エラーは `rule: too_long (count=3)` のような形式になります。拒否された値は決して含まれません。エラーはログに残るものであり、値は個人情報かもしれないからです。
 
 ## ルールを変更するとき
 
@@ -239,9 +239,9 @@ func (CompanyEmail) validate(s string) error {
 
 そのような行をそのまま読まずに失敗させるのは、値オブジェクトの性質によるものです。データベースも含め、パッケージの外から来る値は、常にルールが受け入れる値だからです。
 
-## kanna-validate との連携
+## kanna-validator との連携
 
-[kanna-validate](https://github.com/go-kanna/validate) は、リクエストのフィールドをタグでチェックします。値オブジェクトは自分の形式を自分で守るので、そのフィールドに必要なのはせいぜい `required` だけです。kanna-validate は `required` を `IsZero` でチェックします:
+[kanna-validator](https://github.com/go-kanna/validator) は、リクエストのフィールドをタグでチェックします。値オブジェクトは自分の形式を自分で守るので、そのフィールドに必要なのはせいぜい `required` だけです。kanna-validator は `required` を `IsZero` でチェックします:
 
 ```go
 //kanna:validate
@@ -251,7 +251,7 @@ type SignUp struct {
 }
 ```
 
-`validate.DecodeJSON` は、`UnmarshalJSON` が拒否した値をコードとパラメータとともにフィールドのパスに記録し、デコードを続けます。そのため、レスポンスにはタグで見つかったエラーと一緒に並びます:
+`validator.DecodeJSON` は、`UnmarshalJSON` が拒否した値をコードとパラメータとともにフィールドのパスに記録し、デコードを続けます。そのため、レスポンスにはタグで見つかったエラーと一緒に並びます:
 
 ```json
 {"errors": {"email": [{"error": "email"}], "name": [{"error": "blank"}]}}

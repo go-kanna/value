@@ -62,7 +62,7 @@ const (
 	// zeroCompare compares the value with the zero value of its type.
 	zeroCompare
 	// zeroNil compares a slice, map, or func with nil, as a required one is
-	// told apart in kanna-validate.
+	// told apart in kanna-validator.
 	zeroNil
 	// zeroNone leaves IsZero out, for a value that none of the above can tell,
 	// such as a struct holding a slice. encoding/json's omitzero falls back on
