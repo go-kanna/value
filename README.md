@@ -137,7 +137,7 @@ A few things follow from what `T` is:
   `== nil` nor a method of its own can tell zero, such as a struct holding a slice, gets no `IsZero`; encoding/json's
   `omitzero` falls back on reflection for it.
 - A zero given is the zero never given: when the rule accepts the zero value, as a price of 0, `MustPrice(0)` equals
-  `Price{}`, `IsZero` reports both, `omitzero` leaves both out, and kanna-validate's `required` reports both `blank`.
+  `Price{}`, `IsZero` reports both, `omitzero` leaves both out, and kanna-validator's `required` reports both `blank`.
   Where a value of zero and no value at all mean different things, hold a `*Price`, nil when none was given.
 - `Equal` exists because `==` can be wrong for a time: two of the same instant differ when one carries a monotonic
   clock reading or another location, as a time read back from a database does.
@@ -176,15 +176,15 @@ func OrderStatusValues() []OrderStatus                 // the constants in the o
 func (x OrderStatus) String() string                   // the underlying string; implements fmt.Stringer
 func (x *OrderStatus) UnmarshalText(text []byte) error // what encoding/json decodes a string or an object key with
 func (x *OrderStatus) Scan(src any) error
-func (x OrderStatus) Validate() error                  // whether x is the value of a constant, which kanna-validate calls
+func (x OrderStatus) Validate() error                  // whether x is the value of a constant, which kanna-validator calls
 ```
 
 `String` returns the underlying string without validating it, including for the zero value or an unchecked cast.
 Remove a hand-written `String` method before generating, as for other generated method names.
 
 The constructor, decoding, scanning, and validation methods reject a value that is none of the constants with
-`rule.Fail("inclusion")`, the code kanna-validate's `oneof` reports too, and leave the value as it was. A NULL column is
-an error, as for a value type.
+`rule.Fail("inclusion")`, the code kanna-validator's `oneof` reports too, and leave the value as it was. A NULL column
+is an error, as for a value type.
 
 The type stays a string type with constants, so a `switch` over them, linters checking that a switch is exhaustive, and
 other generators reading the constants work as before. Nothing is generated to encode a value, as encoding/json and
@@ -280,7 +280,7 @@ func (CompanyEmail) validate(s string) error {
 ```
 
 The code names the broken rule in a form stable enough to key a translated message or an API response, and the params
-carry what the message needs. kanna-validate reports the codes of Rails' ActiveModel::Validations, such as `too_long`
+carry what the message needs. kanna-validator reports the codes of Rails' ActiveModel::Validations, such as `too_long`
 with a `count`; using them for your own rules keeps an API's errors alike. An error formats as `rule: too_long
 (count=3)`. The rejected value is never part of it: errors end up in logs, and the value may be personal data.
 
@@ -295,10 +295,10 @@ round: a release rolled back after rows took the new value cannot read them.
 That such a row fails rather than being read as it is follows from what a value type is: a value from outside the
 package, a database included, is always one its rule accepts.
 
-## With kanna-validate
+## With kanna-validator
 
-[kanna-validate](https://github.com/go-kanna/validate) checks the fields of a request by their tags. A value type takes
-care of its own format, so its field needs at most `required`, which kanna-validate checks with `IsZero`:
+[kanna-validator](https://github.com/go-kanna/validator) checks the fields of a request by their tags. A value type
+takes care of its own format, so its field needs at most `required`, which kanna-validator checks with `IsZero`:
 
 ```go
 //kanna:validate
@@ -308,7 +308,7 @@ type SignUp struct {
 }
 ```
 
-`validate.DecodeJSON` records a value that `UnmarshalJSON` rejects at its field's path, with its code and params, and
+`validator.DecodeJSON` records a value that `UnmarshalJSON` rejects at its field's path, with its code and params, and
 goes on decoding, so the response lists it together with whatever the tags find:
 
 ```json
