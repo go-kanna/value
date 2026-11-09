@@ -7,9 +7,9 @@
 [![Release](https://img.shields.io/github/v/tag/go-kanna/value?label=release&sort=semver)](https://github.com/go-kanna/value/tags)
 [![日本語](https://img.shields.io/badge/lang-%E6%97%A5%E6%9C%AC%E8%AA%9E-blue.svg)](README.ja.md)
 
-kanna-value turns a struct holding one value and a `validate` method into a value type — constructors, an accessor,
-and JSON and SQL methods — that holds only what its rule accepts, wherever the value comes from. It also turns a string
-type with constants into an enum that reads from outside only the values of its constants.
+kanna-value turns a struct holding one value and a `validate` method into a value type (constructors, an accessor, and
+JSON and SQL methods) that holds only what its rule accepts, wherever the value comes from. It also turns a string type
+with constants into an enum that reads from outside only the values of its constants.
 
 Part of the [kanna](https://go-kanna.github.io/) family of code generators. Requires Go 1.26.
 
@@ -106,6 +106,7 @@ Code may call what is generated before it exists, as when a type moves to kanna-
 first. kanna-value type-checks the packages it loads once more with what it is about to write in place, and writes
 nothing while their code does not compile with it: a mistake the missing constructor hid is reported then, such as a
 method that the value type does not have.
+
 Another package whose generator reads the value type, such as a kanna-mapper package, needs its `value_gen.go` to exist,
 so on that first run, generate the value type's package before it.
 
@@ -136,9 +137,10 @@ A few things follow from what `T` is:
 - `IsZero` tells the zero value as Go does: a nil slice is zero, an empty one is not. A `T` that neither `==` nor
   `== nil` nor a method of its own can tell zero, such as a struct holding a slice, gets no `IsZero`; encoding/json's
   `omitzero` falls back on reflection for it.
-- A zero given is the zero never given: when the rule accepts the zero value, as a price of 0, `MustPrice(0)` equals
-  `Price{}`, `IsZero` reports both, `omitzero` leaves both out, and kanna-validator's `required` reports both `blank`.
-  Where a value of zero and no value at all mean different things, hold a `*Price`, nil when none was given.
+- A zero given cannot be told from no value given: when the rule accepts the zero value, as a price of 0,
+  `MustPrice(0)` equals `Price{}`, `IsZero` reports both, `omitzero` leaves both out, and kanna-validator's `required`
+  reports both `blank`. Where a value of zero and no value at all mean different things, hold a `*Price`, nil when none
+  was given.
 - `Equal` exists because `==` can be wrong for a time: two of the same instant differ when one carries a monotonic
   clock reading or another location, as a time read back from a database does.
 - database/sql converts a `T` both ways when it is a bool, a number other than a complex one, a string, a `[]byte`, a
@@ -224,7 +226,7 @@ An unexported enum gets unexported functions, `newX` and `xValues`.
 An enum stays a string type, so Go makes a value of it from any string constant, whether or not one of its constants
 holds that value. `o.Status == "shiped"` compiles, and matches no value the enum declares; `o.Status = "shiped"`
 compiles, and sets a value that `Validate` rejects, which database/sql writes as it is and `Scan` refuses to read back.
-`kanna-value vet` finds such constants without running them:
+`kanna-value vet` finds such constants without running the program:
 
 ```sh
 go tool kanna-value vet ./...
@@ -374,8 +376,8 @@ package's files before it runs the generators; the file is gone as it should be
 ## Example
 
 [`example`](example) builds the values of a task service from constants and from input, decodes requests holding them
-— one valid, one with too many tags, one completed before the service began, one with a priority that is none of its
-enum's constants — and shows that a slice it was given cannot be changed from outside. CI regenerates it, checks it with
+(one valid, one with too many tags, one completed before the service began, one with a priority that is none of its
+enum's constants), and shows that a slice it was given cannot be changed from outside. CI regenerates it, checks it with
 `kanna-value vet`, and fails if the output would change or vet reports a constant.
 
 ## Development
