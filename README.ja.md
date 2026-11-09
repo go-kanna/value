@@ -67,7 +67,7 @@ func (x CompletedAt) Equal(y CompletedAt) bool
 // String, IsZero, MarshalJSON, UnmarshalJSON, Value, and Scan, as for Email
 ```
 
-フィールドは非公開なので、パッケージの外で値を得る手段は `NewEmail`、`MustEmail`、`UnmarshalJSON`、`Scan` だけで、どれも `validate` を実行します。`Email` を受け取るコードは、もう一度チェックする必要がありません。ただし、`var e Email` のように Go が `validate` を通さずに作るゼロ値は例外です。ゼロ値は `IsZero` で分かります。`MarshalJSON` と `Value` も `validate` を実行するので、ルールが拒否するゼロ値は、読み戻せずに失敗するのではなく、書き出す時点で止まります。値がないことのあるフィールドは、ポインタ（`*Email`。JSON の null と SQL の NULL では nil のまま）にするか、`json:",omitzero"` タグを付けます。
+フィールドは非公開なので、パッケージの外で値を得る手段は `NewEmail`、`MustEmail`、`UnmarshalJSON`、`Scan` だけで、どれも `validate` を実行します。`Email` を受け取るコードは、もう一度チェックする必要がありません。ただし、`var e Email` のように Go が `validate` を通さずに作るゼロ値は例外です。ゼロ値は `IsZero` で分かります。`MarshalJSON` と `Value` も `validate` を実行するので、ルールが拒否するゼロ値は、読み戻せずに失敗するのではなく、書き出す時点で止まります。値がないことのあるフィールドは、JSON の null と SQL の NULL で nil のままになるポインタ `*Email` にするか、`json:",omitzero"` タグを付けます。
 
 値オブジェクトは独立した型なので、エラーやドキュメントには付けた名前のまま現れ、他の型と同じようにメソッドを定義できます:
 
@@ -78,7 +78,7 @@ func (e Email) Domain() string {
 }
 ```
 
-値オブジェクトにできない構造体は、実行時に値を扱う段階まで持ち越さず、生成の時点で止まります:
+値オブジェクトにできない構造体があると、実行時に値を扱う段階まで持ち越さず、生成の時点で止まります:
 
 ```console
 $ go generate ./...
@@ -157,7 +157,7 @@ func (x OrderStatus) Validate() error                  // whether x is the value
 
 `String` は検証せずに元の文字列を返します。ゼロ値や、直接キャストした未検証の値でも同じです。他の生成メソッドと同じく、手書きの `String` メソッドがある場合は削除してから生成してください。
 
-コンストラクタ、デコード、スキャン、検証のメソッドは、どの定数でもない値を `rule.Fail("inclusion")` で拒否し（kanna-validator の `oneof` が報告するのと同じコードです）、値を変更しません。NULL のカラムは、値オブジェクトと同じくエラーになります。
+コンストラクタ、デコード、スキャン、検証のメソッドは、どの定数でもない値を `rule.Fail("inclusion")` で拒否し（kanna-validator の `oneof` が報告するのと同じコード）、値を変更しません。NULL のカラムは、値オブジェクトと同じくエラーになります。
 
 型は定数を持つ string 型のままなので、定数に対する `switch`、switch の網羅性を調べる linter、定数を読み取る他のジェネレータは、これまでどおり動きます。値をエンコードするコードは生成されません。encoding/json も database/sql も、もともと string としてそのまま送るからです。生成されたコードがチェックするのは外部から来る値です。プログラム内では、他の string 型と同じく `OrderStatus("shiped")` もコンパイルが通るので、値は定数か `NewOrderStatus` で作ってください。そのどちらからも作られなかった値は `Validate` で検出できます。ゼロ値も定数ではないので拒否されます。値がない場合があるなら `*OrderStatus` を使ってください。`"shiped"` のような定数は、[`kanna-value vet`](#enum-に渡す定数を検査する) がプログラムを動かす前に見つけます。
 
@@ -186,7 +186,7 @@ $ go generate ./...
 
 ## enum に渡す定数を検査する
 
-enum は string 型のままなので、Go はどの文字列の定数からでも enum の値を作ります。その値を持つ定数があるかどうかは問いません。`o.Status == "shiped"` はコンパイルが通りますが、enum が宣言したどの値にも一致しません。`o.Status = "shiped"` もコンパイルが通りますが、`Validate` が拒否する値を入れます。database/sql はその値をそのまま書き込み、読み戻すときに `Scan` が拒否します。`kanna-value vet` は、このような定数を、動かさずに見つけます:
+enum は string 型のままなので、Go はどの文字列の定数からでも enum の値を作ります。その値を持つ定数があるかどうかは問いません。`o.Status == "shiped"` はコンパイルが通りますが、enum が宣言したどの値にも一致しません。`o.Status = "shiped"` もコンパイルが通りますが、`Validate` が拒否する値を入れます。database/sql はその値をそのまま書き込み、読み戻すときに `Scan` が拒否します。`kanna-value vet` は、このような定数を、プログラムを動かさずに見つけます:
 
 ```sh
 go tool kanna-value vet ./...
@@ -231,7 +231,7 @@ func (CompanyEmail) validate(s string) error {
 }
 ```
 
-コードは破られたルールの名前で、翻訳メッセージや API レスポンスのキーに使えるほど安定した形式です。パラメータはメッセージに必要な情報を運びます。kanna-validator は `count` 付きの `too_long` のように Rails の ActiveModel::Validations のコードを報告するので、独自のルールでも同じコードを使うと API のエラーがそろいます。エラーは `rule: too_long (count=3)` のような形式になります。拒否された値は決して含まれません。エラーはログに残るものであり、値は個人情報かもしれないからです。
+コードは破られたルールの名前で、翻訳メッセージや API レスポンスのキーに使えるほど安定した形式です。パラメータはメッセージに必要な情報を持ちます。kanna-validator は `count` 付きの `too_long` のように Rails の ActiveModel::Validations のコードを報告するので、独自のルールでも同じコードを使うと API のエラーがそろいます。エラーは `rule: too_long (count=3)` のような形式になります。拒否された値は決して含まれません。エラーはログに残るものであり、値は個人情報かもしれないからです。
 
 ## ルールを変更するとき
 
@@ -302,7 +302,7 @@ $ go generate ./...
 warning: nothing is marked //kanna:value or //kanna:enum in example.com/app/model
 ```
 
-型のディレクティブがすべてなくなったパッケージの `value_gen.go` は、実行時に読み込んだパッケージのコードがその宣言をまだ呼び出していない限り、削除されます。同じ名前でも生成コードのヘッダがないファイルには触れません。削除を行う `go generate` は `open ...: no such file or directory` で終わります。これは go generate 自身のエラーで、ジェネレータを実行する前にパッケージのファイルを列挙しているためです。ファイルは意図どおり削除されています（[golang/go#36068](https://github.com/golang/go/issues/36068)）。
+型のディレクティブがすべてなくなったパッケージの `value_gen.go` は、kanna-value が読み込んだパッケージのコードがその宣言をまだ呼び出していない限り、削除されます。同じ名前でも生成コードのヘッダがないファイルには触れません。削除を行う `go generate` は `open ...: no such file or directory` で終わります。これは go generate 自身のエラーで、ジェネレータを実行する前にパッケージのファイルを列挙しているためです。ファイルは意図どおり削除されています（[golang/go#36068](https://github.com/golang/go/issues/36068)）。
 
 ## サンプル
 
