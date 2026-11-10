@@ -226,38 +226,6 @@ func StatusValues() []Status { return nil }
 			want: "test.go:8:6: error: StatusValues is already declared, so it cannot be generated for Status\n" +
 				"  remove it, or the //kanna:enum on Status",
 		},
-		{
-			name: "//kanna:enum on a struct",
-			src: `package test
-
-//kanna:enum
-type Email struct{ s string }
-`,
-			want: "test.go:4:6: error: Email is a struct, which //kanna:enum does not mark\n" +
-				"  mark it //kanna:value to generate a value type",
-		},
-		{
-			name: "//kanna:value on a string type",
-			src: `package test
-
-//kanna:value
-type Status string
-
-const StatusA Status = "a"
-`,
-			want: "test.go:4:6: error: Status is not a struct, which //kanna:value marks\n" +
-				"  mark it //kanna:enum to accept only the constants declared beside it",
-		},
-		{
-			name: "//kanna:value on another type",
-			src: `package test
-
-//kanna:value
-type Price int
-`,
-			want: "test.go:4:6: error: Price is not a struct, which //kanna:value marks\n" +
-				"  hold the value in a struct with one unexported field",
-		},
 	}
 
 	for _, tt := range tests {

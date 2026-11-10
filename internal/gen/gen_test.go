@@ -435,6 +435,97 @@ const PlanFree Plan = "free"
 	}
 }
 
+// A directive above a declaration it does not mark stops the run at the line,
+// each in the order written, and is not read as marking anything else.
+func TestCommand_RejectsAMisplacedDirective(t *testing.T) {
+	t.Parallel()
+
+	const (
+		value = "error: //kanna:value marks a struct type, not "
+		enum  = "error: //kanna:enum marks a type other than a struct or an interface, not "
+		tail  = ", so nothing reads it\n"
+	)
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "//kanna:enum on a struct",
+			src:  "//kanna:enum\ntype Email struct{ s string }\n",
+			want: "./app.go:3:1: " + enum + "a struct type" + tail +
+				"  write it right above a type other than a struct or an interface\n" +
+				"  or mark it //kanna:value to generate a value type\n",
+		},
+		{
+			name: "//kanna:value on a string type",
+			src:  "//kanna:value\ntype Status string\n\nconst StatusA Status = \"a\"\n",
+			want: "./app.go:3:1: " + value + "a type other than a struct or an interface" + tail +
+				"  write it right above a struct type\n" +
+				"  or mark it //kanna:enum to accept only the constants declared beside it\n",
+		},
+		{
+			name: "//kanna:value on another type",
+			src:  "//kanna:value\ntype Price int\n",
+			want: "./app.go:3:1: " + value + "a type other than a struct or an interface" + tail +
+				"  write it right above a struct type\n",
+		},
+		{
+			name: "//kanna:enum on an alias",
+			src:  "//kanna:enum\ntype Level = string\n\nconst LevelLow Level = \"low\"\n",
+			want: "./app.go:3:1: " + enum + "a type alias" + tail +
+				"  write it right above a type other than a struct or an interface\n",
+		},
+		{
+			name: "//kanna:value on an alias of a struct",
+			src:  "type phone struct{ s string }\n\n//kanna:value\ntype Phone = phone\n",
+			want: "./app.go:5:1: " + value + "a type alias" + tail +
+				"  write it right above a struct type\n",
+		},
+		{
+			name: "//kanna:enum on an interface",
+			src:  "//kanna:enum\ntype Status interface{ String() string }\n",
+			want: "./app.go:3:1: " + enum + "an interface type" + tail +
+				"  write it right above a type other than a struct or an interface\n",
+		},
+		{
+			name: "//kanna:value on a function",
+			src:  "//kanna:value\nfunc NewPhone() {}\n",
+			want: "./app.go:3:1: " + value + "a function" + tail +
+				"  write it right above a struct type\n",
+		},
+		{
+			name: "//kanna:enum on a variable",
+			src:  "//kanna:enum\nvar Levels = []string{\"low\"}\n",
+			want: "./app.go:3:1: " + enum + "a variable" + tail +
+				"  write it right above a type other than a struct or an interface\n",
+		},
+		{
+			name: "both, in the order written",
+			src: "//kanna:value\nconst Low = \"low\"\n\n//kanna:enum\ntype Level struct{ s string }\n\n" +
+				"//kanna:value\nvar High = \"high\"\n",
+			want: "./app.go:3:1: " + value + "a constant" + tail +
+				"  write it right above a struct type\n" +
+				"./app.go:6:1: " + enum + "a struct type" + tail +
+				"  write it right above a type other than a struct or an interface\n" +
+				"  or mark it //kanna:value to generate a value type\n" +
+				"./app.go:9:1: " + value + "a variable" + tail +
+				"  write it right above a struct type\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			dir := writeModule(t, map[string]string{"app.go": "package app\n\n" + tt.src})
+			if code, _, stderr := run(t, dir); code != cli.ExitFailure || stderr != tt.want {
+				t.Errorf("run = %d, stderr %q; want %d and %q", code, stderr, cli.ExitFailure, tt.want)
+			}
+		})
+	}
+}
+
 func TestCommand_WarnsWhenNothingIsMarked(t *testing.T) {
 	t.Parallel()
 
