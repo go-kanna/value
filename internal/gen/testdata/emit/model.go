@@ -66,6 +66,15 @@ func (Tags) validate(t tags) error {
 	return nil
 }
 
+type payload []byte
+
+// Payload holds a []byte, which database/sql would write as NULL when nil.
+//
+//kanna:value
+type Payload struct{ p payload }
+
+func (Payload) validate(payload) error { return nil }
+
 type labels map[string]string
 
 // Labels holds a map, which the generated code copies.

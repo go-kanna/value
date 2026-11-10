@@ -32,6 +32,16 @@ func wantCode(t *testing.T, err error, code string) {
 	}
 }
 
+// wantZero fails t unless err, returned for writing out a zero value, says so
+// as want does.
+func wantZero(t *testing.T, err error, want string) {
+	t.Helper()
+
+	if err == nil || !strings.HasSuffix(err.Error(), want) {
+		t.Errorf("err = %v, want it to end with %q", err, want)
+	}
+}
+
 func TestGenerated_New(t *testing.T) {
 	t.Parallel()
 
@@ -217,6 +227,12 @@ func TestGenerated_JSON(t *testing.T) {
 	// out, it would not read back.
 	_, err = json.Marshal(emit.Email{})
 	wantCode(t, err, "email")
+	wantZero(t, err, "emit: cannot write the zero Email, which its rule rejects; set it, or, "+
+		"where a value may be absent, use a *Email or tag the field omitzero: rule: email")
+	_, err = json.Marshal(emit.MustEmail("a@example.com"))
+	if err != nil {
+		t.Errorf("Marshal(MustEmail(...)) = %v, want nil", err)
+	}
 	if b, err := json.Marshal(emit.Count{}); err != nil || string(b) != "0" {
 		t.Errorf("Marshal(Count{}) = %s, %v; want 0, which the rule accepts", b, err)
 	}
@@ -242,6 +258,19 @@ func TestGenerated_SQL(t *testing.T) {
 	}
 	_, err := (emit.CompletedAt{}).Value()
 	wantCode(t, err, "greater_than_or_equal_to")
+	wantZero(t, err, "emit: cannot write the zero CompletedAt, which its rule rejects; set it, or, "+
+		"where a value may be absent, use a *CompletedAt: rule: greater_than_or_equal_to "+
+		"(count=2000-01-01 00:00:00 +0000 UTC)")
+
+	// database/sql writes a nil []byte as NULL, which Scan refuses.
+	v, err := (emit.Payload{}).Value()
+	if b, ok := v.([]byte); err != nil || !ok || b == nil || len(b) != 0 {
+		t.Errorf("Payload{}.Value() = %#v, %v; want an empty []byte, not nil", v, err)
+	}
+	var p emit.Payload
+	if err := p.Scan(v); err != nil {
+		t.Errorf("Scan(%#v) = %v, want what Value wrote read back", v, err)
+	}
 
 	var at emit.CompletedAt
 	if err := at.Scan(valid); err != nil || !at.Time().Equal(valid) {

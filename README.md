@@ -29,9 +29,15 @@ Hold the value in a struct with one unexported field, and write its rule as a `v
 ```go
 package model
 
-import "github.com/go-kanna/value/rule"
+import (
+	"time"
+
+	"github.com/go-kanna/value/rule"
+)
 
 //go:generate go tool kanna-value
+
+var opened = time.Date(2020, 4, 1, 0, 0, 0, 0, time.UTC)
 
 //kanna:value
 type Email struct{ s string }
@@ -73,8 +79,9 @@ func (x CompletedAt) Equal(y CompletedAt) bool
 The field is unexported, so outside the package a value comes only from `NewEmail`, `MustEmail`, `UnmarshalJSON`, or
 `Scan`, and each of them runs `validate`. Code receiving an `Email` need not check it again, but for the zero value,
 which Go makes without it, as in `var e Email`. `IsZero` tells it, and `MarshalJSON` and `Value` run `validate` as well,
-so a zero value the rule rejects stops where it is written out, rather than where it fails to read back. A field that
-may hold no value is a pointer, `*Email`, which JSON null and SQL NULL leave nil, or is tagged `json:",omitzero"`.
+so a zero value the rule rejects stops where it is written out, rather than where it fails to read back, with an error
+saying it is the zero value, as a field left unset is. A field that may hold no value is a pointer, `*Email`, which JSON
+null and SQL NULL leave nil, or is tagged `json:",omitzero"`.
 
 A value type is a type of its own, named as you named it in errors and documentation, and it takes methods like any
 other:
@@ -131,6 +138,9 @@ A few things follow from what `T` is:
 
 - `T` is a basic or a named type, after which the accessor is named. A slice is held through a type of its own, such as
   `type tags []string`.
+- Several values, such as an amount and its currency, are held as one struct of their own:
+  `type Money struct{ a Amount }` with `type Amount struct{ Units int64; Currency string }`, whose accessor is `Amount`.
+  Export the struct for other packages to call `NewMoney`, as they cannot write a value of an unexported type.
 - `T` is not a pointer, a channel, or a function, named or not: what it refers to would be shared with whoever made
   the value, who could change it past `validate`. Hold what a pointer points to, `url.URL` rather than `*url.URL`.
 - A slice or a map is copied on the way in and on the way out, with `slices.Clone` or `maps.Clone`, so that nothing
@@ -148,7 +158,8 @@ A few things follow from what `T` is:
 - database/sql converts a `T` both ways when it is a bool, a number other than a complex one, a string, a `[]byte`, a
   `time.Time` or a `uuid.UUID`, or when its value has `Value() (driver.Value, error)` and its pointer `Scan(any) error`.
   Any other `T`, such as `type tags []string`, gets no `Value` or `Scan`, which would fail whatever it held: to store
-  one, write them yourself.
+  one, write them yourself. A nil `[]byte` is written empty, as database/sql would write it as NULL, which `Scan`
+  refuses.
 
 Decoding and scanning leave the value as it was on any error, and so does JSON null. A NULL column is an error: scan a
 column that may be NULL into a `*X`, which database/sql sets to nil.
@@ -182,6 +193,9 @@ func (x *OrderStatus) UnmarshalText(text []byte) error // what encoding/json dec
 func (x *OrderStatus) Scan(src any) error
 func (x OrderStatus) Validate() error                  // whether x is the value of a constant, which kanna-validator calls
 ```
+
+Constants declared in more than one file come file by file in the order of the file names, and within a file in the
+order they are declared.
 
 `String` returns the underlying string without validating it, including for the zero value or an unchecked cast.
 Remove a hand-written `String` method before generating, as for other generated method names.
@@ -268,6 +282,9 @@ written with:
 | `rule.Email(s)`                                     | `email`, unless `s` is a bare address such as `a@example.com`                      |
 | `rule.URL(s)`                                       | `url`, unless `s` is an absolute URL with a host name, as in `https://example.com` |
 | `rule.UUID(s)`                                      | `uuid`, unless `s` is a UUID in its standard textual form, of any version          |
+
+`rule.Email` checks the syntax alone, as net/mail parses an address: `a@localhost` passes, and neither the length nor
+whether mail reaches the address is checked.
 
 `rule.URL` does not check the scheme, so `javascript://example.com/%0Aalert(1)` passes. Before writing a URL into a
 link, check its scheme yourself.

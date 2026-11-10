@@ -51,6 +51,10 @@ type target struct {
 	// sql reports whether database/sql converts the value both ways, and so
 	// whether Value and Scan are generated.
 	sql bool
+
+	// bytes reports whether database/sql converts the value as a []byte,
+	// which it writes as NULL when nil.
+	bytes bool
 }
 
 // zeroTest is how the generated IsZero tells the zero value.
@@ -122,9 +126,10 @@ func check(fset *token.FileSet, s scan.Struct, d directive.Directive) (target, [
 	t.hasEqual = hasMethod(f.Type, "Equal", f.Type, types.Typ[types.Bool])
 	t.hasString = hasMethod(f.Type, "String", nil, types.Typ[types.String])
 	t.sql = sqlConverts(f.Type)
-	switch f.Type.Underlying().(type) {
+	switch u := f.Type.Underlying().(type) {
 	case *types.Slice:
 		t.clone = "slices"
+		t.bytes = t.sql && types.Identical(u.Elem(), types.Typ[types.Byte]) && !valuer(f.Type)
 	case *types.Map:
 		t.clone = "maps"
 	}
@@ -141,8 +146,11 @@ func check(fset *token.FileSet, s scan.Struct, d directive.Directive) (target, [
 // only the generated code can set.
 func valueField(s scan.Struct) (scan.Field, []diag.Diag) {
 	if len(s.Fields) != 1 {
-		return scan.Field{}, []diag.Diag{diag.Errorf(s.Pos,
-			"%s must have exactly one field, the value it holds, but has %d", s.Name, len(s.Fields))}
+		d := diag.Errorf(s.Pos, "%s must have exactly one field, the value it holds, but has %d", s.Name, len(s.Fields))
+		if len(s.Fields) > 1 {
+			d = d.WithHints("declare a struct type holding the values, and hold one field of it")
+		}
+		return scan.Field{}, []diag.Diag{d}
 	}
 
 	f := s.Fields[0]

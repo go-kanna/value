@@ -66,6 +66,8 @@ func (Raw) validate(raw) error { return nil }
 		"func (x2 *Raw) UnmarshalJSON(data2 []byte) error {",
 		"if err2 := json2.Unmarshal(data2, &v2); err2 != nil {",
 		"func (x2 Raw) Value() (driver2.Value, error) {",
+		"v2 := x2.r",
+		"return nil, fmt2.Errorf(",
 		"func (x2 *Raw) Scan(src2 any) error {",
 		"var v2 sql2.Null[raw]",
 		"return errors2.New(",
@@ -77,19 +79,22 @@ func (Raw) validate(raw) error { return nil }
 	}
 }
 
-// A value with a String method of its own is formatted by it, and so the file
-// imports fmt only for a value without one.
-func TestEmit_ImportsFmtOnlyToFormat(t *testing.T) {
+// A value with a String method of its own is formatted by it, and a zero value
+// that IsZero cannot tell is not told apart where it is written out, and so the
+// file imports fmt for neither.
+func TestEmit_ImportsFmtOnlyToUse(t *testing.T) {
 	t.Parallel()
 
 	pkg := pkgtest.Load(t, map[string]string{"test.go": `package test
 
-import "time"
+type address struct{ lines []string }
+
+func (address) String() string { return "" }
 
 //kanna:value
-type CompletedAt struct{ t time.Time }
+type Address struct{ a address }
 
-func (CompletedAt) validate(time.Time) error { return nil }
+func (Address) validate(address) error { return nil }
 `})
 
 	got, err := gen.Emit(pkg.Fset, []*packages.Package{pkg}, nil)

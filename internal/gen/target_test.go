@@ -292,7 +292,8 @@ type Empty struct{}
 //kanna:value
 type Pair struct{ a, b int }
 `,
-			want: "Pair must have exactly one field, the value it holds, but has 2",
+			want: "Pair must have exactly one field, the value it holds, but has 2\n" +
+				"  declare a struct type holding the values, and hold one field of it",
 		},
 		{
 			name: "exported field",

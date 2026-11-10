@@ -26,9 +26,15 @@ go get -tool github.com/go-kanna/value/cmd/kanna-value
 ```go
 package model
 
-import "github.com/go-kanna/value/rule"
+import (
+	"time"
+
+	"github.com/go-kanna/value/rule"
+)
 
 //go:generate go tool kanna-value
+
+var opened = time.Date(2020, 4, 1, 0, 0, 0, 0, time.UTC)
 
 //kanna:value
 type Email struct{ s string }
@@ -67,7 +73,7 @@ func (x CompletedAt) Equal(y CompletedAt) bool
 // String, IsZero, MarshalJSON, UnmarshalJSON, Value, and Scan, as for Email
 ```
 
-フィールドは非公開なので、パッケージの外で値を得る手段は `NewEmail`、`MustEmail`、`UnmarshalJSON`、`Scan` だけで、どれも `validate` を実行します。`Email` を受け取るコードは、もう一度チェックする必要がありません。ただし、`var e Email` のように Go が `validate` を通さずに作るゼロ値は例外です。ゼロ値は `IsZero` で分かります。`MarshalJSON` と `Value` も `validate` を実行するので、ルールが拒否するゼロ値は、読み戻せずに失敗するのではなく、書き出す時点で止まります。値がないことのあるフィールドは、JSON の null と SQL の NULL で nil のままになるポインタ `*Email` にするか、`json:",omitzero"` タグを付けます。
+フィールドは非公開なので、パッケージの外で値を得る手段は `NewEmail`、`MustEmail`、`UnmarshalJSON`、`Scan` だけで、どれも `validate` を実行します。`Email` を受け取るコードは、もう一度チェックする必要がありません。ただし、`var e Email` のように Go が `validate` を通さずに作るゼロ値は例外です。ゼロ値は `IsZero` で分かります。`MarshalJSON` と `Value` も `validate` を実行するので、ルールが拒否するゼロ値は、読み戻せずに失敗するのではなく、書き出す時点で、設定し忘れたフィールドのようにゼロ値だと言うエラーで止まります。値がないことのあるフィールドは、JSON の null と SQL の NULL で nil のままになるポインタ `*Email` にするか、`json:",omitzero"` タグを付けます。
 
 値オブジェクトは独立した型なので、エラーやドキュメントには付けた名前のまま現れ、他の型と同じようにメソッドを定義できます:
 
@@ -118,12 +124,13 @@ $ go generate ./...
 `T` によって、次のことが決まります:
 
 - `T` は基本型か名前付き型で、その名前からアクセサの名前が決まります。スライスは `type tags []string` のように独自の型を通して保持します。
+- 金額と通貨のように複数の値を持つときは、それらを 1 つの構造体にまとめて保持します。`type Amount struct{ Units int64; Currency string }` を `type Money struct{ a Amount }` で保持すると、アクセサは `Amount` です。ほかのパッケージから `NewMoney` を呼べるように、構造体は公開します。非公開の型の値は、パッケージの外では書けないからです。
 - `T` は、名前の有無によらず、ポインタ、チャネル、関数にはできません。参照する先を値を作った側と共有し、`validate` のあとで書き換えられるからです。ポインタは、`*url.URL` ではなく `url.URL` のように、指す先を保持します。
 - スライスとマップは、受け取るときと返すときに `slices.Clone` または `maps.Clone` でコピーされるので、`validate` を通った後に変更されることはありません。ただし、要素の中身まではコピーされず、構造体の中のスライスもコピーされません。その場で変更されない値を保持してください。
 - `IsZero` は Go と同じ基準でゼロ値を判定します。nil スライスはゼロ値ですが、空のスライスは違います。`==` でも `== nil` でも独自のメソッドでもゼロ値を判定できない `T`（スライスを持つ構造体など）には `IsZero` が生成されず、encoding/json の `omitzero` はリフレクションにフォールバックします。
 - ゼロを渡すことと何も渡さないことは区別されません。価格の 0 のようにルールがゼロ値を受け入れる場合、`MustPrice(0)` は `Price{}` と等しく、`IsZero` はどちらもゼロと判定し、`omitzero` はどちらも省略し、kanna-validator の `required` はどちらも `blank` と報告します。ゼロという値と値がないことを区別したい場合は、`*Price` で保持し、値がないときは nil にしてください。
 - `Equal` があるのは、時刻では `==` が正しく判定できないことがあるからです。同じ時刻でも、片方がモノトニッククロックの読み取り値を持っていたり、ロケーションが異なっていたりすると `==` では異なるものになります。データベースから読み戻した時刻がこれにあたります。
-- database/sql が `T` を両方向に変換できるのは、`T` が bool、複素数以外の数値、文字列、`[]byte`、`time.Time`、`uuid.UUID` の場合と、`T` の値が `Value() (driver.Value, error)` を、ポインタが `Scan(any) error` を持つ場合です。`type tags []string` のようなそれ以外の `T` には、`Value` と `Scan` を生成しません。生成しても、どの値でも失敗するからです。保存したい場合は、自分で書いてください。
+- database/sql が `T` を両方向に変換できるのは、`T` が bool、複素数以外の数値、文字列、`[]byte`、`time.Time`、`uuid.UUID` の場合と、`T` の値が `Value() (driver.Value, error)` を、ポインタが `Scan(any) error` を持つ場合です。`type tags []string` のようなそれ以外の `T` には、`Value` と `Scan` を生成しません。生成しても、どの値でも失敗するからです。保存したい場合は、自分で書いてください。nil の `[]byte` は空として書き出します。database/sql は NULL として書き、`Scan` が拒否するからです。
 
 デコードとスキャンは、エラーの場合も JSON の null の場合も、値を変更しません。NULL のカラムはエラーになります。NULL になりうるカラムは `*X` にスキャンしてください。その場合 database/sql が nil を設定します。
 
@@ -155,6 +162,8 @@ func (x *OrderStatus) UnmarshalText(text []byte) error // what encoding/json dec
 func (x *OrderStatus) Scan(src any) error
 func (x OrderStatus) Validate() error                  // whether x is the value of a constant, which kanna-validator calls
 ```
+
+定数が複数のファイルにあるときは、ファイル名の順に並び、ファイルの中では宣言した順に並びます。
 
 `String` は検証せずに元の文字列を返します。ゼロ値や、直接キャストした未検証の値でも同じです。他の生成メソッドと同じく、手書きの `String` メソッドがある場合は削除してから生成してください。
 
@@ -217,6 +226,8 @@ enum とは、`//kanna:enum` の印が付いた string 型です。検査する�
 | `rule.Email(s)` | `s` が `a@example.com` のような素のアドレスでなければ `email` |
 | `rule.URL(s)` | `s` が `https://example.com` のようなホスト名付きの絶対 URL でなければ `url` |
 | `rule.UUID(s)` | `s` が標準のテキスト形式の UUID でなければ `uuid`。バージョンは問わない |
+
+`rule.Email` は、net/mail がアドレスを解析するのと同じく構文だけを見ます。`a@localhost` も通り、長さや、そのアドレスにメールが届くかは確かめません。
 
 `rule.URL` はスキームを確かめないので、`javascript://example.com/%0Aalert(1)` も通ります。リンクとして出すなら、スキームを自分で確かめてください。
 
