@@ -61,7 +61,7 @@ const (
 	zeroMethod zeroTest = iota
 	// zeroCompare compares the value with the zero value of its type.
 	zeroCompare
-	// zeroNil compares a slice, map, or func with nil, as a required one is
+	// zeroNil compares a slice or a map with nil, as a required one is
 	// told apart in kanna-validator.
 	zeroNil
 	// zeroNone leaves IsZero out, for a value that none of the above can tell,
@@ -165,6 +165,27 @@ func valueField(s scan.Struct) (scan.Field, []diag.Diag) {
 // accessorOf names the method returning the value of f after its type, and
 // says why it cannot be named so.
 func accessorOf(s scan.Struct, f scan.Field) (string, []diag.Diag) {
+	// What a pointer, a channel, or a function refers to is shared with the
+	// caller, who can change it past validate.
+	switch u := f.Type.Underlying().(type) {
+	case *types.Pointer:
+		return "", []diag.Diag{diag.Errorf(f.Pos,
+			"%s holds a pointer, %s, through which what it points to can be changed past validate",
+			s.Name, typeString(s, f.Type)).
+			WithHints("hold what it points to, " + typeString(s, u.Elem()))}
+	case *types.Basic:
+		if u.Kind() == types.UnsafePointer {
+			return "", []diag.Diag{diag.Errorf(f.Pos,
+				"%s holds a pointer, %s, through which what it points to can be changed past validate",
+				s.Name, typeString(s, f.Type))}
+		}
+	case *types.Chan:
+		return "", []diag.Diag{diag.Errorf(f.Pos,
+			"%s holds a channel, %s, whose contents can be changed past validate", s.Name, typeString(s, f.Type))}
+	case *types.Signature:
+		return "", []diag.Diag{diag.Errorf(f.Pos,
+			"%s holds a function, %s, whose behavior no rule can be written for", s.Name, typeString(s, f.Type))}
+	}
 	if _, named := types.Unalias(f.Type).(*types.Named); named && types.IsInterface(f.Type) {
 		return "", []diag.Diag{diag.Errorf(f.Pos,
 			"%s holds an interface, %s, whose dynamic value no rule can be written for",
@@ -215,7 +236,7 @@ func zeroOf(t types.Type) zeroTest {
 		return zeroCompare
 	}
 	switch t.Underlying().(type) {
-	case *types.Slice, *types.Map, *types.Signature:
+	case *types.Slice, *types.Map:
 		return zeroNil
 	}
 	return zeroNone

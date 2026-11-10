@@ -343,6 +343,63 @@ type Failure struct{ err error }
 			want: "Failure holds an interface, error, whose dynamic value no rule can be written for",
 		},
 		{
+			name: "pointer",
+			src: `package test
+
+import "net/url"
+
+//kanna:value
+type Link struct{ u *url.URL }
+`,
+			want: "Link holds a pointer, *url.URL, through which what it points to can be changed past validate\n" +
+				"  hold what it points to, url.URL",
+		},
+		{
+			name: "named pointer",
+			src: `package test
+
+type sp *string
+
+//kanna:value
+type P struct{ p sp }
+`,
+			want: "P holds a pointer, sp, through which what it points to can be changed past validate\n" +
+				"  hold what it points to, string",
+		},
+		{
+			name: "unsafe pointer",
+			src: `package test
+
+import "unsafe"
+
+//kanna:value
+type P struct{ p unsafe.Pointer }
+`,
+			want: "P holds a pointer, unsafe.Pointer, through which what it points to can be changed past validate",
+		},
+		{
+			name: "named channel",
+			src: `package test
+
+type queue chan int
+
+//kanna:value
+type Queue struct{ q queue }
+`,
+			want: "Queue holds a channel, queue, whose contents can be changed past validate",
+		},
+		{
+			name: "named function",
+			src: `package test
+
+type hook func()
+
+//kanna:value
+type Hook struct{ h hook }
+`,
+			want: "Hook holds a function, hook, whose behavior no rule can be written for",
+		},
+		{
 			name: "unnamed type",
 			src: `package test
 
