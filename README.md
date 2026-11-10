@@ -264,8 +264,11 @@ written with:
 |-----------------------------------------------------|------------------------------------------------------------------------------------|
 | `rule.Fail(code)`, `rule.FailWith(code, params)`    | an `*rule.Error` with your code and params                                         |
 | `rule.Email(s)`                                     | `email`, unless `s` is a bare address such as `a@example.com`                      |
-| `rule.URL(s)`                                       | `url`, unless `s` is an absolute URL with a host, such as `https://example.com`     |
+| `rule.URL(s)`                                       | `url`, unless `s` is an absolute URL with a host name, as in `https://example.com` |
 | `rule.UUID(s)`                                      | `uuid`, unless `s` is a UUID in its standard textual form, of any version          |
+
+`rule.URL` does not check the scheme, so `javascript://example.com/%0Aalert(1)` passes. Before writing a URL into a
+link, check its scheme yourself.
 
 A rule is a plain function, so rules combine as any Go code does:
 
