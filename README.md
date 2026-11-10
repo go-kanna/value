@@ -117,6 +117,9 @@ method that the value type does not have.
 Another package whose generator reads the value type, such as a kanna-mapper package, needs its `value_gen.go` to exist,
 so on that first run, generate the value type's package before it.
 
+With two or more kanna generators, run them with [`go tool kanna gen`](https://github.com/go-kanna/kanna), which runs
+them in the order they need.
+
 ## What is generated
 
 For a struct `X` holding a value of type `T` in its field `t`:
@@ -289,7 +292,8 @@ written with:
 | `rule.UUID(s)`                                      | `uuid`, unless `s` is a UUID in its standard textual form, of any version          |
 
 `rule.Email` checks the syntax alone, as net/mail parses an address: `a@localhost` passes, and neither the length nor
-whether mail reaches the address is checked.
+whether mail reaches the address is checked. A form that net/mail would rewrite, such as a quoted local part
+(`"a b"@example.com`), is rejected, so that an accepted value is always kept as written.
 
 `rule.URL` does not check the scheme, so `javascript://example.com/%0Aalert(1)` passes. Before writing a URL into a
 link, check its scheme yourself.
