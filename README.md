@@ -29,9 +29,15 @@ Hold the value in a struct with one unexported field, and write its rule as a `v
 ```go
 package model
 
-import "github.com/go-kanna/value/rule"
+import (
+	"time"
+
+	"github.com/go-kanna/value/rule"
+)
 
 //go:generate go tool kanna-value
+
+var opened = time.Date(2020, 4, 1, 0, 0, 0, 0, time.UTC)
 
 //kanna:value
 type Email struct{ s string }
