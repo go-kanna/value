@@ -192,7 +192,11 @@ const (
 func NewOrderStatus(v string) (OrderStatus, error)    // OrderStatus(v), if it is the value of a constant
 func OrderStatusValues() []OrderStatus                 // the constants in the order they are declared, in a new slice
 func (x OrderStatus) String() string                   // the underlying string; implements fmt.Stringer
-func (x *OrderStatus) UnmarshalText(text []byte) error // what encoding/json decodes a string or an object key with
+func (x OrderStatus) MarshalText() ([]byte, error)     // checks what it encodes
+func (x *OrderStatus) UnmarshalText(text []byte) error // checks what it decodes
+func (x OrderStatus) MarshalJSON() ([]byte, error)
+func (x *OrderStatus) UnmarshalJSON(data []byte) error
+func (x OrderStatus) Value() (driver.Value, error)
 func (x *OrderStatus) Scan(src any) error
 func (x OrderStatus) Validate() error                  // whether x is the value of a constant, which kanna-validator calls
 ```
@@ -203,17 +207,18 @@ order they are declared.
 `String` returns the underlying string without validating it, including for the zero value or an unchecked cast.
 Remove a hand-written `String` method before generating, as for other generated method names.
 
-The constructor, decoding, scanning, and validation methods reject a value that is none of the constants with
-`rule.Fail("inclusion")`, the code kanna-validator's `oneof` reports too, and leave the value as it was. A NULL column
-is an error, as for a value type.
+The constructor and the methods that decode, scan, encode, write, and validate reject a value that is none of the
+constants with `rule.Fail("inclusion")`, the code kanna-validator's `oneof` reports too. Decoding and scanning leave the
+value as it was on any error, and so does JSON null. A NULL column is an error, as for a value type.
 
 The type stays a string type with constants, so a `switch` over them, linters checking that a switch is exhaustive, and
-other generators reading the constants work as before. Nothing is generated to encode a value, as encoding/json and
-database/sql already send it as the string it is. What the generated code checks is what comes from outside: within the
-program, `OrderStatus("shiped")` compiles as for any string type, so make values with the constants or with
-`NewOrderStatus`. `Validate` catches a value that did not come from either, and the zero value, which is no constant
-either: use a `*OrderStatus` where a value may be absent. [`kanna-value vet`](#checking-the-constants-given-to-an-enum)
-finds a constant such as `"shiped"` before the program runs.
+other generators reading the constants work as before. Within the program, `OrderStatus("shiped")` compiles as for any
+string type, so make values with the constants or with `NewOrderStatus`. `Validate` catches a value that did not come
+from either, and so do `MarshalText`, `MarshalJSON`, and `Value`, so that what is written out reads back. The zero
+value is no constant either, and writing it out fails saying it is the zero value, as a field left unset is: use a
+`*OrderStatus` where a value may be absent, which JSON null and SQL NULL leave nil, or tag the field `json:",omitzero"`.
+[`kanna-value vet`](#checking-the-constants-given-to-an-enum) finds a constant such as `"shiped"` before the program
+runs.
 
 Each constant is one value of the enum, which the generators reading it take one by one, so two constants holding one
 value stop generation, as a mistake in copying one would. Give a value another name, such as a default, with a
@@ -343,7 +348,7 @@ goes on decoding, so the response lists it together with whatever the tags find:
 {"errors": {"email": [{"error": "email"}], "name": [{"error": "blank"}]}}
 ```
 
-An enum needs no `oneof` either: a status that `UnmarshalText` rejects is recorded as
+An enum needs no `oneof` either: a status that `UnmarshalJSON` rejects is recorded as
 `{"errors": {"status": [{"error": "inclusion"}]}}`.
 
 ## Linting

@@ -301,8 +301,20 @@ func PriorityValues() []Priority {
 // String returns the underlying string.
 func (x Priority) String() string { return string(x) }
 
+// MarshalText returns the underlying string of x if Validate accepts it, so
+// that UnmarshalText reads it back.
+func (x Priority) MarshalText() ([]byte, error) {
+	if err := x.Validate(); err != nil {
+		if x == "" {
+			return nil, fmt.Errorf("model: cannot write the zero Priority, which its rule rejects; set it, or, where a value may be absent, use a *Priority: %w", err)
+		}
+		return nil, err
+	}
+	return []byte(x), nil
+}
+
 // UnmarshalText sets x to Priority(text) if NewPriority accepts it, as
-// encoding/json does for a JSON string. On error x is left as it was.
+// encoding/json does for an object key. On error x is left as it was.
 func (x *Priority) UnmarshalText(text []byte) error {
 	y, err := NewPriority(string(text))
 	if err != nil {
@@ -310,6 +322,48 @@ func (x *Priority) UnmarshalText(text []byte) error {
 	}
 	*x = y
 	return nil
+}
+
+// MarshalJSON encodes the underlying string of x as a JSON string if Validate
+// accepts it, so that UnmarshalJSON reads it back.
+func (x Priority) MarshalJSON() ([]byte, error) {
+	if err := x.Validate(); err != nil {
+		if x == "" {
+			return nil, fmt.Errorf("model: cannot write the zero Priority, which its rule rejects; set it, or, where a value may be absent, use a *Priority or tag the field omitzero: %w", err)
+		}
+		return nil, err
+	}
+	return json.Marshal(string(x))
+}
+
+// UnmarshalJSON decodes a JSON string, and sets x to it if NewPriority accepts
+// it. JSON null, like an error, leaves x as it was.
+func (x *Priority) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return nil
+	}
+	var v string
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	y, err := NewPriority(v)
+	if err != nil {
+		return err
+	}
+	*x = y
+	return nil
+}
+
+// Value returns the underlying string of x for a database driver if Validate
+// accepts it, so that Scan reads it back.
+func (x Priority) Value() (driver.Value, error) {
+	if err := x.Validate(); err != nil {
+		if x == "" {
+			return nil, fmt.Errorf("model: cannot write the zero Priority, which its rule rejects; set it, or, where a value may be absent, use a *Priority: %w", err)
+		}
+		return nil, err
+	}
+	return string(x), nil
 }
 
 // Scan reads a string from a database column, and sets x to it if NewPriority

@@ -160,7 +160,11 @@ const (
 func NewOrderStatus(v string) (OrderStatus, error)    // OrderStatus(v), if it is the value of a constant
 func OrderStatusValues() []OrderStatus                 // the constants in the order they are declared, in a new slice
 func (x OrderStatus) String() string                   // the underlying string; implements fmt.Stringer
-func (x *OrderStatus) UnmarshalText(text []byte) error // what encoding/json decodes a string or an object key with
+func (x OrderStatus) MarshalText() ([]byte, error)     // checks what it encodes
+func (x *OrderStatus) UnmarshalText(text []byte) error // checks what it decodes
+func (x OrderStatus) MarshalJSON() ([]byte, error)
+func (x *OrderStatus) UnmarshalJSON(data []byte) error
+func (x OrderStatus) Value() (driver.Value, error)
 func (x *OrderStatus) Scan(src any) error
 func (x OrderStatus) Validate() error                  // whether x is the value of a constant, which kanna-validator calls
 ```
@@ -169,9 +173,9 @@ func (x OrderStatus) Validate() error                  // whether x is the value
 
 `String` は検証せずに元の文字列を返します。ゼロ値や、直接キャストした未検証の値でも同じです。他の生成メソッドと同じく、手書きの `String` メソッドがある場合は削除してから生成してください。
 
-コンストラクタ、デコード、スキャン、検証のメソッドは、どの定数でもない値を `rule.Fail("inclusion")` で拒否し（kanna-validator の `oneof` が報告するのと同じコード）、値を変更しません。NULL のカラムは、値オブジェクトと同じくエラーになります。
+コンストラクタと、デコード、スキャン、エンコード、書き出し、検証のメソッドは、どの定数でもない値を `rule.Fail("inclusion")` で拒否します（kanna-validator の `oneof` が報告するのと同じコード）。デコードとスキャンは、エラーの場合も JSON の null の場合も、値を変更しません。NULL のカラムは、値オブジェクトと同じくエラーになります。
 
-型は定数を持つ string 型のままなので、定数に対する `switch`、switch の網羅性を調べる linter、定数を読み取る他のジェネレータは、これまでどおり動きます。値をエンコードするコードは生成されません。encoding/json も database/sql も、もともと string としてそのまま送るからです。生成されたコードがチェックするのは外部から来る値です。プログラム内では、他の string 型と同じく `OrderStatus("shiped")` もコンパイルが通るので、値は定数か `NewOrderStatus` で作ってください。そのどちらからも作られなかった値は `Validate` で検出できます。ゼロ値も定数ではないので拒否されます。値がない場合があるなら `*OrderStatus` を使ってください。`"shiped"` のような定数は、[`kanna-value vet`](#enum-に渡す定数を検査する) がプログラムを動かす前に見つけます。
+型は定数を持つ string 型のままなので、定数に対する `switch`、switch の網羅性を調べる linter、定数を読み取る他のジェネレータは、これまでどおり動きます。プログラム内では、他の string 型と同じく `OrderStatus("shiped")` もコンパイルが通るので、値は定数か `NewOrderStatus` で作ってください。そのどちらからも作られなかった値は `Validate` で検出でき、`MarshalText`、`MarshalJSON`、`Value` も同じく拒否するので、書き出したものは読み戻せます。ゼロ値も定数ではないので、書き出すと、設定し忘れたフィールドのようにゼロ値だと言うエラーで止まります。値がない場合があるなら、JSON の null と SQL の NULL で nil のままになる `*OrderStatus` を使うか、`json:",omitzero"` タグを付けてください。`"shiped"` のような定数は、[`kanna-value vet`](#enum-に渡す定数を検査する) がプログラムを動かす前に見つけます。
 
 定数 1 つが enum の値 1 つで、enum を読む生成器はそれを 1 つずつ扱います。そのため、同じ値を持つ 2 つの定数は、コピーの誤りと同じく生成を止めます。既定値のように、ある値に別の名前を付けたいときは、関数で書きます:
 
@@ -273,7 +277,7 @@ type SignUp struct {
 {"errors": {"email": [{"error": "email"}], "name": [{"error": "blank"}]}}
 ```
 
-enum にも `oneof` は不要です。`UnmarshalText` が拒否した status は `{"errors": {"status": [{"error": "inclusion"}]}}` として記録されます。
+enum にも `oneof` は不要です。`UnmarshalJSON` が拒否した status は `{"errors": {"status": [{"error": "inclusion"}]}}` として記録されます。
 
 ## Lint
 
