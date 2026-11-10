@@ -110,6 +110,7 @@ func generate(set packages.Set) ([]output.Change, []diag.Diag) {
 	for _, pkg := range set.Packages {
 		diags = append(diags, directive.Loose(directive.Lines(set.Fset, pkg.Syntax), directiveKey, enumKey)...)
 	}
+	diags = append(diags, misplaced(set.Fset, set.Packages)...)
 	if diag.HasErrors(diags) {
 		return nil, diags
 	}

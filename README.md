@@ -239,9 +239,13 @@ $ go generate ./...
   or, to name OrderStatusPaid otherwise, declare func OrderStatusSettled() OrderStatus instead
 ./order.go:13:2: error: OrderStatusNone holds "", the zero value of OrderStatus, which stands for none
   remove it, and use a *OrderStatus where a value may be absent
-./order.go:20:6: error: Kind is not a struct, which //kanna:value marks
-  mark it //kanna:enum to accept only the constants declared beside it
+./order.go:19:1: error: //kanna:value marks a struct type, not a type other than a struct or an interface, so nothing reads it
+  write it right above a struct type
+  or mark it //kanna:enum to accept only the constants declared beside it
 ```
+
+`//kanna:value` marks a struct type, and `//kanna:enum` a string type. Either one above anything else, such as a type
+alias, a function, or a variable, stops generation at the line.
 
 An unexported enum gets unexported functions, `newX` and `xValues`.
 

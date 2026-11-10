@@ -35,37 +35,19 @@ var enumMethods = []string{
 
 // enums returns the types marked //kanna:enum that an enum can be generated
 // from, in the order scan reports them, and says what is wrong with the rest.
-// It also tells a directive on the wrong kind of type: //kanna:value on a type
-// other than a struct, which scan.Structs does not read, and //kanna:enum on a
-// struct.
+// A struct or an interface marked //kanna:enum is left to misplaced.
 func enums(fset *token.FileSet, decls []scan.Type) ([]enum, []diag.Diag) {
 	var (
 		found []enum
 		diags []diag.Diag
 	)
 	for _, t := range decls {
-		if _, ok := t.Named.Underlying().(*types.Struct); ok {
-			d, ds := directive.Find(fset, t.Doc, enumKey)
-			diags = append(diags, ds...)
-			if d.Found {
-				diags = append(diags, diag.Errorf(t.Pos, "%s is a struct, which //kanna:%s does not mark", t.Name, enumKey).
-					WithHints("mark it //kanna:"+directiveKey+" to generate a value type"))
-			}
+		switch t.Named.Underlying().(type) {
+		case *types.Struct, *types.Interface:
 			continue
 		}
 
-		d, ds := directive.Find(fset, t.Doc, directiveKey)
-		diags = append(diags, ds...)
-		if d.Found {
-			hint := "hold the value in a struct with one unexported field"
-			if isString(t.Named) {
-				hint = "mark it //kanna:" + enumKey + " to accept only the constants declared beside it"
-			}
-			diags = append(diags, diag.Errorf(t.Pos, "%s is not a struct, which //kanna:%s marks", t.Name, directiveKey).
-				WithHints(hint))
-		}
-
-		d, ds = directive.Find(fset, t.Doc, enumKey)
+		d, ds := directive.Find(fset, t.Doc, enumKey)
 		diags = append(diags, ds...)
 		if !d.Found {
 			continue
