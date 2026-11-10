@@ -177,7 +177,7 @@ func (w writer) writeJSON() {
 		"method of %s accepts it, so that UnmarshalJSON reads it back: the zero %s is made without it.",
 		w.desc, x, w.Name, w.Name))
 	fmt.Fprintf(w.f, "func (%s %s) MarshalJSON() ([]byte, error) {\n", x, w.Name)
-	w.validated(x, err)
+	w.validated(x, err, "use a *"+w.Name+" or tag the field omitzero")
 	fmt.Fprintf(w.f, "return %s.Marshal(%s.%s)\n", json, x, w.field.Name)
 	fmt.Fprintf(w.f, "}\n\n")
 
@@ -207,7 +207,7 @@ func (w writer) writeSQL() {
 		"database/sql converts an argument of %s, if the validate method of %s accepts it, so that Scan "+
 		"reads it back: the zero %s is made without it.", w.desc, x, w.desc, w.Name, w.Name))
 	fmt.Fprintf(w.f, "func (%s %s) Value() (%s.Value, error) {\n", x, w.Name, driver)
-	w.validated(x, err)
+	w.validated(x, err, "use a *"+w.Name)
 	fmt.Fprintf(w.f, "return %s.DefaultParameterConverter.ConvertValue(%s.%s)\n", driver, x, w.field.Name)
 	fmt.Fprintf(w.f, "}\n\n")
 
@@ -230,9 +230,18 @@ func (w writer) writeSQL() {
 }
 
 // validated starts a method writing out the value x holds: it returns err,
-// with nothing written, unless the validate method accepts the value.
-func (w writer) validated(x, err string) {
+// with nothing written, unless the validate method accepts the value. The zero
+// value is told apart where IsZero can tell it, as a value left unset, and
+// absent says what to do where a value may be absent instead.
+func (w writer) validated(x, err, absent string) {
 	fmt.Fprintf(w.f, "if %s := %s.validate(%s.%s); %s != nil {\n", err, x, x, w.field.Name, err)
+	if w.zero != zeroNone {
+		fmt.Fprintf(w.f, "if %s.IsZero() {\n", x)
+		fmt.Fprintf(w.f, "return nil, %s.Errorf(%q, %s)\n", w.f.Import("fmt", "fmt"),
+			w.pkgName+": cannot write the zero "+w.Name+", which its rule rejects; set it, or, "+
+				"where a value may be absent, "+absent+": %w", err)
+		fmt.Fprintf(w.f, "}\n")
+	}
 	fmt.Fprintf(w.f, "return nil, %s\n", err)
 	fmt.Fprintf(w.f, "}\n")
 }

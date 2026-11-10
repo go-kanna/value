@@ -67,7 +67,7 @@ func (x CompletedAt) Equal(y CompletedAt) bool
 // String, IsZero, MarshalJSON, UnmarshalJSON, Value, and Scan, as for Email
 ```
 
-フィールドは非公開なので、パッケージの外で値を得る手段は `NewEmail`、`MustEmail`、`UnmarshalJSON`、`Scan` だけで、どれも `validate` を実行します。`Email` を受け取るコードは、もう一度チェックする必要がありません。ただし、`var e Email` のように Go が `validate` を通さずに作るゼロ値は例外です。ゼロ値は `IsZero` で分かります。`MarshalJSON` と `Value` も `validate` を実行するので、ルールが拒否するゼロ値は、読み戻せずに失敗するのではなく、書き出す時点で止まります。値がないことのあるフィールドは、JSON の null と SQL の NULL で nil のままになるポインタ `*Email` にするか、`json:",omitzero"` タグを付けます。
+フィールドは非公開なので、パッケージの外で値を得る手段は `NewEmail`、`MustEmail`、`UnmarshalJSON`、`Scan` だけで、どれも `validate` を実行します。`Email` を受け取るコードは、もう一度チェックする必要がありません。ただし、`var e Email` のように Go が `validate` を通さずに作るゼロ値は例外です。ゼロ値は `IsZero` で分かります。`MarshalJSON` と `Value` も `validate` を実行するので、ルールが拒否するゼロ値は、読み戻せずに失敗するのではなく、書き出す時点で、設定し忘れたフィールドのようにゼロ値だと言うエラーで止まります。値がないことのあるフィールドは、JSON の null と SQL の NULL で nil のままになるポインタ `*Email` にするか、`json:",omitzero"` タグを付けます。
 
 値オブジェクトは独立した型なので、エラーやドキュメントには付けた名前のまま現れ、他の型と同じようにメソッドを定義できます:
 

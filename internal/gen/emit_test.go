@@ -77,19 +77,22 @@ func (Raw) validate(raw) error { return nil }
 	}
 }
 
-// A value with a String method of its own is formatted by it, and so the file
-// imports fmt only for a value without one.
-func TestEmit_ImportsFmtOnlyToFormat(t *testing.T) {
+// A value with a String method of its own is formatted by it, and a zero value
+// that IsZero cannot tell is not told apart where it is written out, and so the
+// file imports fmt for neither.
+func TestEmit_ImportsFmtOnlyToUse(t *testing.T) {
 	t.Parallel()
 
 	pkg := pkgtest.Load(t, map[string]string{"test.go": `package test
 
-import "time"
+type address struct{ lines []string }
+
+func (address) String() string { return "" }
 
 //kanna:value
-type CompletedAt struct{ t time.Time }
+type Address struct{ a address }
 
-func (CompletedAt) validate(time.Time) error { return nil }
+func (Address) validate(address) error { return nil }
 `})
 
 	got, err := gen.Emit(pkg.Fset, []*packages.Package{pkg}, nil)

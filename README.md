@@ -73,8 +73,9 @@ func (x CompletedAt) Equal(y CompletedAt) bool
 The field is unexported, so outside the package a value comes only from `NewEmail`, `MustEmail`, `UnmarshalJSON`, or
 `Scan`, and each of them runs `validate`. Code receiving an `Email` need not check it again, but for the zero value,
 which Go makes without it, as in `var e Email`. `IsZero` tells it, and `MarshalJSON` and `Value` run `validate` as well,
-so a zero value the rule rejects stops where it is written out, rather than where it fails to read back. A field that
-may hold no value is a pointer, `*Email`, which JSON null and SQL NULL leave nil, or is tagged `json:",omitzero"`.
+so a zero value the rule rejects stops where it is written out, rather than where it fails to read back, with an error
+saying it is the zero value, as a field left unset is. A field that may hold no value is a pointer, `*Email`, which JSON
+null and SQL NULL leave nil, or is tagged `json:",omitzero"`.
 
 A value type is a type of its own, named as you named it in errors and documentation, and it takes methods like any
 other:

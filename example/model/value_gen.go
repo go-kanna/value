@@ -49,6 +49,9 @@ func (x Email) IsZero() bool {
 // the zero Email is made without it.
 func (x Email) MarshalJSON() ([]byte, error) {
 	if err := x.validate(x.s); err != nil {
+		if x.IsZero() {
+			return nil, fmt.Errorf("model: cannot write the zero Email, which its rule rejects; set it, or, where a value may be absent, use a *Email or tag the field omitzero: %w", err)
+		}
 		return nil, err
 	}
 	return json.Marshal(x.s)
@@ -78,6 +81,9 @@ func (x *Email) UnmarshalJSON(data []byte) error {
 // accepts it, so that Scan reads it back: the zero Email is made without it.
 func (x Email) Value() (driver.Value, error) {
 	if err := x.validate(x.s); err != nil {
+		if x.IsZero() {
+			return nil, fmt.Errorf("model: cannot write the zero Email, which its rule rejects; set it, or, where a value may be absent, use a *Email: %w", err)
+		}
 		return nil, err
 	}
 	return driver.DefaultParameterConverter.ConvertValue(x.s)
@@ -148,6 +154,9 @@ func (x CompletedAt) Equal(y CompletedAt) bool {
 // it back: the zero CompletedAt is made without it.
 func (x CompletedAt) MarshalJSON() ([]byte, error) {
 	if err := x.validate(x.t); err != nil {
+		if x.IsZero() {
+			return nil, fmt.Errorf("model: cannot write the zero CompletedAt, which its rule rejects; set it, or, where a value may be absent, use a *CompletedAt or tag the field omitzero: %w", err)
+		}
 		return nil, err
 	}
 	return json.Marshal(x.t)
@@ -178,6 +187,9 @@ func (x *CompletedAt) UnmarshalJSON(data []byte) error {
 // made without it.
 func (x CompletedAt) Value() (driver.Value, error) {
 	if err := x.validate(x.t); err != nil {
+		if x.IsZero() {
+			return nil, fmt.Errorf("model: cannot write the zero CompletedAt, which its rule rejects; set it, or, where a value may be absent, use a *CompletedAt: %w", err)
+		}
 		return nil, err
 	}
 	return driver.DefaultParameterConverter.ConvertValue(x.t)
@@ -243,6 +255,9 @@ func (x Tags) IsZero() bool {
 // zero Tags is made without it.
 func (x Tags) MarshalJSON() ([]byte, error) {
 	if err := x.validate(x.t); err != nil {
+		if x.IsZero() {
+			return nil, fmt.Errorf("model: cannot write the zero Tags, which its rule rejects; set it, or, where a value may be absent, use a *Tags or tag the field omitzero: %w", err)
+		}
 		return nil, err
 	}
 	return json.Marshal(x.t)
