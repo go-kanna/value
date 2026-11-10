@@ -194,6 +194,9 @@ func (x *OrderStatus) Scan(src any) error
 func (x OrderStatus) Validate() error                  // whether x is the value of a constant, which kanna-validator calls
 ```
 
+Constants declared in more than one file come file by file in the order of the file names, and within a file in the
+order they are declared.
+
 `String` returns the underlying string without validating it, including for the zero value or an unchecked cast.
 Remove a hand-written `String` method before generating, as for other generated method names.
 
@@ -279,6 +282,9 @@ written with:
 | `rule.Email(s)`                                     | `email`, unless `s` is a bare address such as `a@example.com`                      |
 | `rule.URL(s)`                                       | `url`, unless `s` is an absolute URL with a host name, as in `https://example.com` |
 | `rule.UUID(s)`                                      | `uuid`, unless `s` is a UUID in its standard textual form, of any version          |
+
+`rule.Email` checks the syntax alone, as net/mail parses an address: `a@localhost` passes, and neither the length nor
+whether mail reaches the address is checked.
 
 `rule.URL` does not check the scheme, so `javascript://example.com/%0Aalert(1)` passes. Before writing a URL into a
 link, check its scheme yourself.

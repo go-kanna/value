@@ -163,6 +163,8 @@ func (x *OrderStatus) Scan(src any) error
 func (x OrderStatus) Validate() error                  // whether x is the value of a constant, which kanna-validator calls
 ```
 
+定数が複数のファイルにあるときは、ファイル名の順に並び、ファイルの中では宣言した順に並びます。
+
 `String` は検証せずに元の文字列を返します。ゼロ値や、直接キャストした未検証の値でも同じです。他の生成メソッドと同じく、手書きの `String` メソッドがある場合は削除してから生成してください。
 
 コンストラクタ、デコード、スキャン、検証のメソッドは、どの定数でもない値を `rule.Fail("inclusion")` で拒否し（kanna-validator の `oneof` が報告するのと同じコード）、値を変更しません。NULL のカラムは、値オブジェクトと同じくエラーになります。
@@ -224,6 +226,8 @@ enum とは、`//kanna:enum` の印が付いた string 型です。検査する�
 | `rule.Email(s)` | `s` が `a@example.com` のような素のアドレスでなければ `email` |
 | `rule.URL(s)` | `s` が `https://example.com` のようなホスト名付きの絶対 URL でなければ `url` |
 | `rule.UUID(s)` | `s` が標準のテキスト形式の UUID でなければ `uuid`。バージョンは問わない |
+
+`rule.Email` は、net/mail がアドレスを解析するのと同じく構文だけを見ます。`a@localhost` も通り、長さや、そのアドレスにメールが届くかは確かめません。
 
 `rule.URL` はスキームを確かめないので、`javascript://example.com/%0Aalert(1)` も通ります。リンクとして出すなら、スキームを自分で確かめてください。
 
