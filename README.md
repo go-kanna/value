@@ -131,6 +131,8 @@ A few things follow from what `T` is:
 
 - `T` is a basic or a named type, after which the accessor is named. A slice is held through a type of its own, such as
   `type tags []string`.
+- `T` is not a pointer, a channel, or a function, named or not: what it refers to would be shared with whoever made
+  the value, who could change it past `validate`. Hold what a pointer points to, `url.URL` rather than `*url.URL`.
 - A slice or a map is copied on the way in and on the way out, with `slices.Clone` or `maps.Clone`, so that nothing
   changes it past `validate`. What it holds is not copied in turn, nor is a slice inside a struct: hold values that
   are not changed in place.
