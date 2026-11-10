@@ -100,7 +100,7 @@ func Uses(o Order) bool {
 	o.Status = "opne"
 	_ = Order{Status: "close"}
 	use("shut")
-	_ = model.Status("Open")
+	_ = model.Status("OPEN")
 	_ = string(model.Status("x"))
 	switch o.Status {
 	case "pending":
@@ -149,7 +149,7 @@ var _ = model.Status("bogus")
 		`usecase.go:20:20: error: "close" is none of the constants of model.Status`,
 		`  did you mean model.StatusClosed?`,
 		`usecase.go:21:6: error: "shut" is none of the constants of model.Status`,
-		`usecase.go:22:6: error: "Open" is none of the constants of model.Status`,
+		`usecase.go:22:6: error: "OPEN" is none of the constants of model.Status`,
 		`  did you mean model.StatusOpen?`,
 		`usecase.go:23:13: error: "x" is none of the constants of model.Status`,
 		`usecase.go:25:7: error: "pending" is none of the constants of model.Status`,

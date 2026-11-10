@@ -274,8 +274,15 @@ func (c *checker) report(pkg *packages.Package, e ast.Expr, v string, en *enum) 
 			values = append(values, constant.StringVal(k.Val()))
 		}
 	}
-	if closest, ok := suggest.Closest(v, values); ok {
-		k := named[slices.Index(values, closest)]
+	// A value differing in case alone is suggested however many letters differ.
+	i := slices.IndexFunc(values, func(s string) bool { return strings.EqualFold(s, v) })
+	if i < 0 {
+		if closest, ok := suggest.Closest(v, values); ok {
+			i = slices.Index(values, closest)
+		}
+	}
+	if i >= 0 {
+		k := named[i]
 		name := k.Name()
 		if q := qualifier(k.Pkg()); q != "" {
 			name = q + "." + name
