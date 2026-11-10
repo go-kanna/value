@@ -132,6 +132,9 @@ A few things follow from what `T` is:
 
 - `T` is a basic or a named type, after which the accessor is named. A slice is held through a type of its own, such as
   `type tags []string`.
+- Several values, such as an amount and its currency, are held as one struct of their own:
+  `type Money struct{ a Amount }` with `type Amount struct{ Units int64; Currency string }`, whose accessor is `Amount`.
+  Export the struct for other packages to call `NewMoney`, as they cannot write a value of an unexported type.
 - `T` is not a pointer, a channel, or a function, named or not: what it refers to would be shared with whoever made
   the value, who could change it past `validate`. Hold what a pointer points to, `url.URL` rather than `*url.URL`.
 - A slice or a map is copied on the way in and on the way out, with `slices.Clone` or `maps.Clone`, so that nothing

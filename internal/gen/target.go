@@ -146,8 +146,11 @@ func check(fset *token.FileSet, s scan.Struct, d directive.Directive) (target, [
 // only the generated code can set.
 func valueField(s scan.Struct) (scan.Field, []diag.Diag) {
 	if len(s.Fields) != 1 {
-		return scan.Field{}, []diag.Diag{diag.Errorf(s.Pos,
-			"%s must have exactly one field, the value it holds, but has %d", s.Name, len(s.Fields))}
+		d := diag.Errorf(s.Pos, "%s must have exactly one field, the value it holds, but has %d", s.Name, len(s.Fields))
+		if len(s.Fields) > 1 {
+			d = d.WithHints("declare a struct type holding the values, and hold one field of it")
+		}
+		return scan.Field{}, []diag.Diag{d}
 	}
 
 	f := s.Fields[0]
