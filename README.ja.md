@@ -214,8 +214,10 @@ enum とは、`//kanna:enum` の印が付いた string 型です。検査する�
 |---|---|
 | `rule.Fail(code)`, `rule.FailWith(code, params)` | 指定したコードとパラメータを持つ `*rule.Error` |
 | `rule.Email(s)` | `s` が `a@example.com` のような素のアドレスでなければ `email` |
-| `rule.URL(s)` | `s` が `https://example.com` のようなホスト付きの絶対 URL でなければ `url` |
+| `rule.URL(s)` | `s` が `https://example.com` のようなホスト名付きの絶対 URL でなければ `url` |
 | `rule.UUID(s)` | `s` が標準のテキスト形式の UUID でなければ `uuid`。バージョンは問わない |
+
+`rule.URL` はスキームを確かめないので、`javascript://example.com/%0Aalert(1)` も通ります。リンクとして出すなら、スキームを自分で確かめてください。
 
 ルールはただの関数なので、普通の Go のコードとして組み合わせられます:
 
