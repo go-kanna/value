@@ -6,7 +6,9 @@ import "net/mail"
 // as "a@example.com", as net/mail parses one. A display name, angle brackets, a
 // comment, or surrounding space is rejected, so that an accepted s can be used
 // as an address as it stands. Only the syntax is checked: "a@localhost"
-// passes, and neither the length nor whether mail reaches s is checked.
+// passes, and neither the length nor whether mail reaches s is checked. A form
+// that net/mail would rewrite, such as a quoted local part ("\"a b\"@example.com"),
+// is rejected, so that an accepted s is always kept as written.
 func Email(s string) error {
 	a, err := mail.ParseAddress(s)
 	if err != nil || a.Name != "" || a.Address != s {
