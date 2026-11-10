@@ -261,6 +261,16 @@ func TestGenerated_SQL(t *testing.T) {
 	wantZero(t, err, "emit: cannot write the zero CompletedAt, which its rule rejects; set it, or, "+
 		"where a value may be absent, use a *CompletedAt: rule: greater_than_or_equal_to (count=2000-01-01 00:00:00 +0000 UTC)")
 
+	// database/sql writes a nil []byte as NULL, which Scan refuses.
+	v, err := (emit.Payload{}).Value()
+	if b, ok := v.([]byte); err != nil || !ok || b == nil || len(b) != 0 {
+		t.Errorf("Payload{}.Value() = %#v, %v; want an empty []byte, not nil", v, err)
+	}
+	var p emit.Payload
+	if err := p.Scan(v); err != nil {
+		t.Errorf("Scan(%#v) = %v, want what Value wrote read back", v, err)
+	}
+
 	var at emit.CompletedAt
 	if err := at.Scan(valid); err != nil || !at.Time().Equal(valid) {
 		t.Errorf("Scan(%v) = %v, leaving %v; want it held", valid, err, at)

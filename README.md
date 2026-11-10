@@ -149,7 +149,8 @@ A few things follow from what `T` is:
 - database/sql converts a `T` both ways when it is a bool, a number other than a complex one, a string, a `[]byte`, a
   `time.Time` or a `uuid.UUID`, or when its value has `Value() (driver.Value, error)` and its pointer `Scan(any) error`.
   Any other `T`, such as `type tags []string`, gets no `Value` or `Scan`, which would fail whatever it held: to store
-  one, write them yourself.
+  one, write them yourself. A nil `[]byte` is written empty, as database/sql would write it as NULL, which `Scan`
+  refuses.
 
 Decoding and scanning leave the value as it was on any error, and so does JSON null. A NULL column is an error: scan a
 column that may be NULL into a `*X`, which database/sql sets to nil.

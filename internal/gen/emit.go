@@ -203,12 +203,25 @@ func (w writer) writeSQL() {
 
 	sc := w.f.Scope()
 	x, err := sc.Name("x"), sc.Name("err")
-	w.doc(fmt.Sprintf("Value returns the %s that %s holds for a database driver, converted as "+
+	doc := fmt.Sprintf("Value returns the %s that %s holds for a database driver, converted as "+
 		"database/sql converts an argument of %s, if the validate method of %s accepts it, so that Scan "+
-		"reads it back: the zero %s is made without it.", w.desc, x, w.desc, w.Name, w.Name))
+		"reads it back: the zero %s is made without it.", w.desc, x, w.desc, w.Name, w.Name)
+	if w.bytes {
+		doc += " A nil " + w.desc + " is written empty rather than as NULL, which Scan refuses."
+	}
+	w.doc(doc)
 	fmt.Fprintf(w.f, "func (%s %s) Value() (%s.Value, error) {\n", x, w.Name, driver)
 	w.validated(x, err, "use a *"+w.Name)
-	fmt.Fprintf(w.f, "return %s.DefaultParameterConverter.ConvertValue(%s.%s)\n", driver, x, w.field.Name)
+	value := x + "." + w.field.Name
+	if w.bytes {
+		v := sc.Name("v")
+		fmt.Fprintf(w.f, "%s := %s\n", v, value)
+		fmt.Fprintf(w.f, "if %s == nil {\n", v)
+		fmt.Fprintf(w.f, "%s = %s{}\n", v, w.typ)
+		fmt.Fprintf(w.f, "}\n")
+		value = v
+	}
+	fmt.Fprintf(w.f, "return %s.DefaultParameterConverter.ConvertValue(%s)\n", driver, value)
 	fmt.Fprintf(w.f, "}\n\n")
 
 	sc = w.f.Scope()

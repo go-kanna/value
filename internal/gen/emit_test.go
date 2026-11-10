@@ -66,6 +66,8 @@ func (Raw) validate(raw) error { return nil }
 		"func (x2 *Raw) UnmarshalJSON(data2 []byte) error {",
 		"if err2 := json2.Unmarshal(data2, &v2); err2 != nil {",
 		"func (x2 Raw) Value() (driver2.Value, error) {",
+		"v2 := x2.r",
+		"return nil, fmt2.Errorf(",
 		"func (x2 *Raw) Scan(src2 any) error {",
 		"var v2 sql2.Null[raw]",
 		"return errors2.New(",

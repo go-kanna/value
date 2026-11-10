@@ -480,6 +480,112 @@ func (x *Tags) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// NewPayload returns the Payload holding a copy of v if the validate method of
+// Payload accepts it, and the method's error otherwise.
+func NewPayload(v payload) (Payload, error) {
+	v = slices.Clone(v)
+	if err := (Payload{}).validate(v); err != nil {
+		return Payload{}, err
+	}
+	return Payload{p: v}, nil
+}
+
+// MustPayload is NewPayload for values known to be valid, such as constants. It
+// panics if v is rejected.
+func MustPayload(v payload) Payload {
+	x, err := NewPayload(v)
+	if err != nil {
+		panic(err)
+	}
+	return x
+}
+
+// Payload returns a copy of the payload that x holds.
+func (x Payload) Payload() payload {
+	return slices.Clone(x.p)
+}
+
+// String formats the payload that x holds as fmt's %v does.
+func (x Payload) String() string {
+	return fmt.Sprint(x.p)
+}
+
+// IsZero reports whether x holds the zero value of payload, as the zero Payload
+// does.
+func (x Payload) IsZero() bool {
+	return x.p == nil
+}
+
+// MarshalJSON encodes the payload that x holds as encoding/json encodes it, if
+// the validate method of Payload accepts it, so that UnmarshalJSON reads it
+// back: the zero Payload is made without it.
+func (x Payload) MarshalJSON() ([]byte, error) {
+	if err := x.validate(x.p); err != nil {
+		if x.IsZero() {
+			return nil, fmt.Errorf("emit: cannot write the zero Payload, which its rule rejects; set it, or, where a value may be absent, use a *Payload or tag the field omitzero: %w", err)
+		}
+		return nil, err
+	}
+	return json.Marshal(x.p)
+}
+
+// UnmarshalJSON decodes data as encoding/json decodes a value of payload, and
+// keeps the value only if the validate method of Payload accepts it. JSON null,
+// like an error, leaves x as it was.
+func (x *Payload) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return nil
+	}
+	var v payload
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	y, err := NewPayload(v)
+	if err != nil {
+		return err
+	}
+	*x = y
+	return nil
+}
+
+// Value returns the payload that x holds for a database driver, converted as
+// database/sql converts an argument of payload, if the validate method of
+// Payload accepts it, so that Scan reads it back: the zero Payload is made
+// without it. A nil payload is written empty rather than as NULL, which Scan
+// refuses.
+func (x Payload) Value() (driver.Value, error) {
+	if err := x.validate(x.p); err != nil {
+		if x.IsZero() {
+			return nil, fmt.Errorf("emit: cannot write the zero Payload, which its rule rejects; set it, or, where a value may be absent, use a *Payload: %w", err)
+		}
+		return nil, err
+	}
+	v := x.p
+	if v == nil {
+		v = payload{}
+	}
+	return driver.DefaultParameterConverter.ConvertValue(v)
+}
+
+// Scan reads a value of payload from a database column, and keeps it only if
+// the validate method of Payload accepts it. On error x is left as it was. NULL
+// is an error: scan a column that may be NULL into a pointer to Payload.
+func (x *Payload) Scan(src any) error {
+	var v sql.Null[payload]
+	if err := v.Scan(src); err != nil {
+		return err
+	}
+	if !v.Valid {
+		return errors.New("emit: cannot scan NULL into Payload; scan a column that may be NULL into *Payload")
+	}
+	y, err := NewPayload(v.V)
+	if err != nil {
+		return err
+	}
+	*x = y
+	return nil
+}
+
 // NewLabels returns the Labels holding a copy of v if the validate method of
 // Labels accepts it, and the method's error otherwise.
 func NewLabels(v labels) (Labels, error) {

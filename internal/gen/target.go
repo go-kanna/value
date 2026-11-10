@@ -51,6 +51,10 @@ type target struct {
 	// sql reports whether database/sql converts the value both ways, and so
 	// whether Value and Scan are generated.
 	sql bool
+
+	// bytes reports whether database/sql converts the value as a []byte,
+	// which it writes as NULL when nil.
+	bytes bool
 }
 
 // zeroTest is how the generated IsZero tells the zero value.
@@ -122,9 +126,10 @@ func check(fset *token.FileSet, s scan.Struct, d directive.Directive) (target, [
 	t.hasEqual = hasMethod(f.Type, "Equal", f.Type, types.Typ[types.Bool])
 	t.hasString = hasMethod(f.Type, "String", nil, types.Typ[types.String])
 	t.sql = sqlConverts(f.Type)
-	switch f.Type.Underlying().(type) {
+	switch u := f.Type.Underlying().(type) {
 	case *types.Slice:
 		t.clone = "slices"
+		t.bytes = t.sql && types.Identical(u.Elem(), types.Typ[types.Byte]) && !valuer(f.Type)
 	case *types.Map:
 		t.clone = "maps"
 	}
