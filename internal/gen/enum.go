@@ -29,7 +29,9 @@ type enum struct {
 }
 
 // enumMethods are the methods generated on an enum.
-var enumMethods = []string{"String", "UnmarshalText", "Scan", "Validate"}
+var enumMethods = []string{
+	"String", "MarshalText", "UnmarshalText", "MarshalJSON", "UnmarshalJSON", "Value", "Scan", "Validate",
+}
 
 // enums returns the types marked //kanna:enum that an enum can be generated
 // from, in the order scan reports them, and says what is wrong with the rest.

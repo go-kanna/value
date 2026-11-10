@@ -420,6 +420,50 @@ func TestGenerated_EnumJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"status":null}`), &got); err != nil || got.Status != emit.StatusPlaced {
 		t.Errorf("Unmarshal of null = %v, leaving %q; want nil, leaving it as it was", err, got.Status)
 	}
+	// encoding/json/v2 hands null to UnmarshalJSON rather than set the zero
+	// value, so the method itself leaves the value too.
+	kept := emit.StatusPlaced
+	if err := kept.UnmarshalJSON([]byte("null")); err != nil || kept != emit.StatusPlaced {
+		t.Errorf("UnmarshalJSON(null) = %v, leaving %q; want nil, leaving it as it was", err, kept)
+	}
+
+	// Nothing that would not read back is written out.
+	_, err = json.Marshal(order{})
+	wantCode(t, err, "inclusion")
+	wantZero(t, err, "emit: cannot write the zero Status, which its rule rejects; set it, or, "+
+		"where a value may be absent, use a *Status or tag the field omitzero: rule: inclusion")
+	_, err = json.Marshal(order{Status: "refunded"})
+	wantCode(t, err, "inclusion")
+	if err != nil && strings.Contains(err.Error(), "zero") {
+		t.Errorf("err = %v, want no word of the zero value for a value other than it", err)
+	}
+	_, err = emit.Status("").MarshalText()
+	wantZero(t, err, "emit: cannot write the zero Status, which its rule rejects; set it, or, "+
+		"where a value may be absent, use a *Status: rule: inclusion")
+	if b, err := emit.StatusPaid.MarshalText(); err != nil || string(b) != "paid" {
+		t.Errorf("MarshalText() = %s, %v; want paid", b, err)
+	}
+}
+
+func TestGenerated_EnumValue(t *testing.T) {
+	t.Parallel()
+
+	if v, err := emit.StatusPaid.Value(); err != nil || v != "paid" {
+		t.Errorf("Value() = %#v, %v; want \"paid\"", v, err)
+	}
+	_, err := emit.Status("").Value()
+	wantCode(t, err, "inclusion")
+	wantZero(t, err, "emit: cannot write the zero Status, which its rule rejects; set it, or, "+
+		"where a value may be absent, use a *Status: rule: inclusion")
+	_, err = emit.Status("refunded").Value()
+	wantCode(t, err, "inclusion")
+
+	// database/sql calls Value for an argument, and writes a nil pointer as NULL.
+	if v, err := driver.DefaultParameterConverter.ConvertValue((*emit.Status)(nil)); err != nil || v != nil {
+		t.Errorf("ConvertValue(nil *Status) = %#v, %v; want nil", v, err)
+	}
+	_, err = driver.DefaultParameterConverter.ConvertValue(emit.Status(""))
+	wantCode(t, err, "inclusion")
 }
 
 func TestGenerated_EnumScan(t *testing.T) {

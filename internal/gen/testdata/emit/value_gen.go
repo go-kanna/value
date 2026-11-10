@@ -731,8 +731,20 @@ func StatusValues() []Status {
 // String returns the underlying string.
 func (x Status) String() string { return string(x) }
 
+// MarshalText returns the underlying string of x if Validate accepts it, so
+// that UnmarshalText reads it back.
+func (x Status) MarshalText() ([]byte, error) {
+	if err := x.Validate(); err != nil {
+		if x == "" {
+			return nil, fmt.Errorf("emit: cannot write the zero Status, which its rule rejects; set it, or, where a value may be absent, use a *Status: %w", err)
+		}
+		return nil, err
+	}
+	return []byte(x), nil
+}
+
 // UnmarshalText sets x to Status(text) if NewStatus accepts it, as
-// encoding/json does for a JSON string. On error x is left as it was.
+// encoding/json does for an object key. On error x is left as it was.
 func (x *Status) UnmarshalText(text []byte) error {
 	y, err := NewStatus(string(text))
 	if err != nil {
@@ -740,6 +752,48 @@ func (x *Status) UnmarshalText(text []byte) error {
 	}
 	*x = y
 	return nil
+}
+
+// MarshalJSON encodes the underlying string of x as a JSON string if Validate
+// accepts it, so that UnmarshalJSON reads it back.
+func (x Status) MarshalJSON() ([]byte, error) {
+	if err := x.Validate(); err != nil {
+		if x == "" {
+			return nil, fmt.Errorf("emit: cannot write the zero Status, which its rule rejects; set it, or, where a value may be absent, use a *Status or tag the field omitzero: %w", err)
+		}
+		return nil, err
+	}
+	return json.Marshal(string(x))
+}
+
+// UnmarshalJSON decodes a JSON string, and sets x to it if NewStatus accepts
+// it. JSON null, like an error, leaves x as it was.
+func (x *Status) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return nil
+	}
+	var v string
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	y, err := NewStatus(v)
+	if err != nil {
+		return err
+	}
+	*x = y
+	return nil
+}
+
+// Value returns the underlying string of x for a database driver if Validate
+// accepts it, so that Scan reads it back.
+func (x Status) Value() (driver.Value, error) {
+	if err := x.Validate(); err != nil {
+		if x == "" {
+			return nil, fmt.Errorf("emit: cannot write the zero Status, which its rule rejects; set it, or, where a value may be absent, use a *Status: %w", err)
+		}
+		return nil, err
+	}
+	return string(x), nil
 }
 
 // Scan reads a string from a database column, and sets x to it if NewStatus
@@ -787,8 +841,20 @@ func kindValues() []kind {
 // String returns the underlying string.
 func (x kind) String() string { return string(x) }
 
+// MarshalText returns the underlying string of x if Validate accepts it, so
+// that UnmarshalText reads it back.
+func (x kind) MarshalText() ([]byte, error) {
+	if err := x.Validate(); err != nil {
+		if x == "" {
+			return nil, fmt.Errorf("emit: cannot write the zero kind, which its rule rejects; set it, or, where a value may be absent, use a *kind: %w", err)
+		}
+		return nil, err
+	}
+	return []byte(x), nil
+}
+
 // UnmarshalText sets x to kind(text) if newKind accepts it, as encoding/json
-// does for a JSON string. On error x is left as it was.
+// does for an object key. On error x is left as it was.
 func (x *kind) UnmarshalText(text []byte) error {
 	y, err := newKind(string(text))
 	if err != nil {
@@ -796,6 +862,48 @@ func (x *kind) UnmarshalText(text []byte) error {
 	}
 	*x = y
 	return nil
+}
+
+// MarshalJSON encodes the underlying string of x as a JSON string if Validate
+// accepts it, so that UnmarshalJSON reads it back.
+func (x kind) MarshalJSON() ([]byte, error) {
+	if err := x.Validate(); err != nil {
+		if x == "" {
+			return nil, fmt.Errorf("emit: cannot write the zero kind, which its rule rejects; set it, or, where a value may be absent, use a *kind or tag the field omitzero: %w", err)
+		}
+		return nil, err
+	}
+	return json.Marshal(string(x))
+}
+
+// UnmarshalJSON decodes a JSON string, and sets x to it if newKind accepts it.
+// JSON null, like an error, leaves x as it was.
+func (x *kind) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return nil
+	}
+	var v string
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	y, err := newKind(v)
+	if err != nil {
+		return err
+	}
+	*x = y
+	return nil
+}
+
+// Value returns the underlying string of x for a database driver if Validate
+// accepts it, so that Scan reads it back.
+func (x kind) Value() (driver.Value, error) {
+	if err := x.Validate(); err != nil {
+		if x == "" {
+			return nil, fmt.Errorf("emit: cannot write the zero kind, which its rule rejects; set it, or, where a value may be absent, use a *kind: %w", err)
+		}
+		return nil, err
+	}
+	return string(x), nil
 }
 
 // Scan reads a string from a database column, and sets x to it if newKind

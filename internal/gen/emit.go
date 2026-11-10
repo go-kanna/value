@@ -52,7 +52,10 @@ func emit(pkgPath, pkgName string, targets []target, enums []enum, declared []st
 		w.writeNew()
 		w.writeValues()
 		w.writeString()
+		w.writeMarshalText()
 		w.writeUnmarshalText()
+		w.writeJSON()
+		w.writeValue()
 		w.writeScan()
 		w.writeValidate()
 	}
@@ -315,15 +318,82 @@ func (w enumWriter) writeString() {
 	fmt.Fprintf(w.f, "func (%s %s) String() string { return string(%s) }\n\n", x, w.Name, x)
 }
 
+func (w enumWriter) writeMarshalText() {
+	sc := w.f.Scope()
+	x, err := sc.Name("x"), sc.Name("err")
+
+	writeDoc(w.f, fmt.Sprintf("MarshalText returns the underlying string of %s if Validate accepts it, "+
+		"so that UnmarshalText reads it back.", x))
+	fmt.Fprintf(w.f, "func (%s %s) MarshalText() ([]byte, error) {\n", x, w.Name)
+	w.validated(x, err, "use a *"+w.Name)
+	fmt.Fprintf(w.f, "return []byte(%s), nil\n", x)
+	fmt.Fprintf(w.f, "}\n\n")
+}
+
 func (w enumWriter) writeUnmarshalText() {
 	sc := w.f.Scope()
 	x, text, y, err := sc.Name("x"), sc.Name("text"), sc.Name("y"), sc.Name("err")
 
 	writeDoc(w.f, fmt.Sprintf("UnmarshalText sets %s to %s(%s) if %s accepts it, as encoding/json does "+
-		"for a JSON string. On error %s is left as it was.", x, w.Name, text, w.newFunc, x))
+		"for an object key. On error %s is left as it was.", x, w.Name, text, w.newFunc, x))
 	fmt.Fprintf(w.f, "func (%s *%s) UnmarshalText(%s []byte) error {\n", x, w.Name, text)
 	keep(w.f, w.newFunc, x, y, err, "string("+text+")")
 	fmt.Fprintf(w.f, "}\n\n")
+}
+
+func (w enumWriter) writeJSON() {
+	json := w.f.Import("encoding/json", "json")
+
+	sc := w.f.Scope()
+	x, err := sc.Name("x"), sc.Name("err")
+	writeDoc(w.f, fmt.Sprintf("MarshalJSON encodes the underlying string of %s as a JSON string if Validate "+
+		"accepts it, so that UnmarshalJSON reads it back.", x))
+	fmt.Fprintf(w.f, "func (%s %s) MarshalJSON() ([]byte, error) {\n", x, w.Name)
+	w.validated(x, err, "use a *"+w.Name+" or tag the field omitzero")
+	fmt.Fprintf(w.f, "return %s.Marshal(string(%s))\n", json, x)
+	fmt.Fprintf(w.f, "}\n\n")
+
+	sc = w.f.Scope()
+	x, data, v, y, err := sc.Name("x"), sc.Name("data"), sc.Name("v"), sc.Name("y"), sc.Name("err")
+	writeDoc(w.f, fmt.Sprintf("UnmarshalJSON decodes a JSON string, and sets %s to it if %s accepts it. "+
+		"JSON null, like an error, leaves %s as it was.", x, w.newFunc, x))
+	fmt.Fprintf(w.f, "func (%s *%s) UnmarshalJSON(%s []byte) error {\n", x, w.Name, data)
+	fmt.Fprintf(w.f, "if string(%s) == \"null\" {\n", data)
+	fmt.Fprintf(w.f, "return nil\n")
+	fmt.Fprintf(w.f, "}\n")
+	fmt.Fprintf(w.f, "var %s string\n", v)
+	fmt.Fprintf(w.f, "if %s := %s.Unmarshal(%s, &%s); %s != nil {\n", err, json, data, v, err)
+	fmt.Fprintf(w.f, "return %s\n", err)
+	fmt.Fprintf(w.f, "}\n")
+	keep(w.f, w.newFunc, x, y, err, v)
+	fmt.Fprintf(w.f, "}\n\n")
+}
+
+func (w enumWriter) writeValue() {
+	driver := w.f.Import("database/sql/driver", "driver")
+
+	sc := w.f.Scope()
+	x, err := sc.Name("x"), sc.Name("err")
+	writeDoc(w.f, fmt.Sprintf("Value returns the underlying string of %s for a database driver if Validate "+
+		"accepts it, so that Scan reads it back.", x))
+	fmt.Fprintf(w.f, "func (%s %s) Value() (%s.Value, error) {\n", x, w.Name, driver)
+	w.validated(x, err, "use a *"+w.Name)
+	fmt.Fprintf(w.f, "return string(%s), nil\n", x)
+	fmt.Fprintf(w.f, "}\n\n")
+}
+
+// validated starts a method writing out x: it returns err, with nothing
+// written, unless Validate accepts x. The zero value is told apart, as a value
+// left unset, and absent says what to do where a value may be absent instead.
+func (w enumWriter) validated(x, err, absent string) {
+	fmt.Fprintf(w.f, "if %s := %s.Validate(); %s != nil {\n", err, x, err)
+	fmt.Fprintf(w.f, "if %s == \"\" {\n", x)
+	fmt.Fprintf(w.f, "return nil, %s.Errorf(%q, %s)\n", w.f.Import("fmt", "fmt"),
+		w.pkgName+": cannot write the zero "+w.Name+", which its rule rejects; set it, or, "+
+			"where a value may be absent, "+absent+": %w", err)
+	fmt.Fprintf(w.f, "}\n")
+	fmt.Fprintf(w.f, "return nil, %s\n", err)
+	fmt.Fprintf(w.f, "}\n")
 }
 
 func (w enumWriter) writeScan() {
