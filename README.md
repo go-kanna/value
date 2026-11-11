@@ -11,7 +11,7 @@ kanna-value turns a struct holding one value and a `validate` method into a valu
 JSON and SQL methods) that holds only what its rule accepts, wherever the value comes from. It also turns a string type
 with constants into an enum that reads from outside only the values of its constants.
 
-Part of the [kanna](https://go-kanna.github.io/) family of code generators. Requires Go 1.26.
+Part of the [kanna](https://go-kanna.github.io/) family of code generators. Requires Go 1.27.
 
 ## Install
 
@@ -65,7 +65,9 @@ func MustEmail(v string) Email                   // for a constant: panics if v 
 func (x Email) String() string                   // the string held
 func (x Email) IsZero() bool
 func (x Email) MarshalJSON() ([]byte, error)     // checks what it encodes
+func (x Email) MarshalJSONTo(enc *jsontext.Encoder) error
 func (x *Email) UnmarshalJSON(data []byte) error // checks what it decodes
+func (x *Email) UnmarshalJSONFrom(dec *jsontext.Decoder) error
 func (x Email) Value() (driver.Value, error)     // checks what it writes
 func (x *Email) Scan(src any) error              // checks what it scans
 
@@ -73,15 +75,20 @@ func NewCompletedAt(v time.Time) (CompletedAt, error)
 func MustCompletedAt(v time.Time) CompletedAt
 func (x CompletedAt) Time() time.Time
 func (x CompletedAt) Equal(y CompletedAt) bool
-// String, IsZero, MarshalJSON, UnmarshalJSON, Value, and Scan, as for Email
+// String, IsZero, the JSON methods, Value, and Scan, as for Email
 ```
 
-The field is unexported, so outside the package a value comes only from `NewEmail`, `MustEmail`, `UnmarshalJSON`, or
-`Scan`, and each of them runs `validate`. Code receiving an `Email` need not check it again, but for the zero value,
-which Go makes without it, as in `var e Email`. `IsZero` tells it, and `MarshalJSON` and `Value` run `validate` as well,
-so a zero value the rule rejects stops where it is written out, rather than where it fails to read back, with an error
-saying it is the zero value, as a field left unset is. A field that may hold no value is a pointer, `*Email`, which JSON
-null and SQL NULL leave nil, or is tagged `json:",omitzero"`.
+The field is unexported, so outside the package a value comes only from `NewEmail`, `MustEmail`, `UnmarshalJSON`,
+`UnmarshalJSONFrom`, or `Scan`, and each of them runs `validate`. Code receiving an `Email` need not check it again, but
+for the zero value, which Go makes without it, as in `var e Email`. `IsZero` tells it, and the methods that write the
+value out run `validate` as well, so a zero value the rule rejects stops where it is written out, rather than where it
+fails to read back, with an error saying it is the zero value, as a field left unset is. A field that may hold no value
+is a pointer, `*Email`, which JSON null and SQL NULL leave nil, or is tagged `json:",omitzero"`.
+
+The JSON methods use encoding/json/v2. Both encoding/json/v2 and encoding/json call `MarshalJSONTo` and
+`UnmarshalJSONFrom` first, and these pass the options of the call on to the value, so an `Email` comes out as its string
+would in the same call: `<` is escaped, and invalid UTF-8 replaced or rejected, exactly when they are for the string.
+`MarshalJSON` and `UnmarshalJSON` remain for code that calls them directly, and use the defaults of encoding/json/v2.
 
 A value type is a type of its own, named as you named it in errors and documentation, and it takes methods like any
 other:
@@ -132,7 +139,8 @@ For a struct `X` holding a value of type `T` in its field `t`:
 | `String() string`                              | the value's own `String` if it has one, or else fmt's `%v`; for a `string`, the accessor itself                                  |
 | `IsZero() bool`                                | the value's own `IsZero` if it has one, or else `==` with the zero value, or `== nil` for a slice or a map                       |
 | `Equal(y X) bool`                              | only when `T` has `Equal(T) bool`, as `time.Time` does                                                                           |
-| `MarshalJSON`, `UnmarshalJSON`                 | encode the value as `T` encodes, if `validate` accepts it; decode a `T` and keep it only if `validate` accepts it                 |
+| `MarshalJSON`, `UnmarshalJSON`                 | encode the value as encoding/json/v2 encodes a `T`, if `validate` accepts it; decode a `T`, kept only if `validate` accepts it    |
+| `MarshalJSONTo`, `UnmarshalJSONFrom`           | the same, with the options of the encoder or the decoder                                                                          |
 | `Value`, `Scan`                                | only when database/sql converts a `T` both ways; convert the value as it converts a `T`, if `validate` accepts it; scan a `T` and keep it only if `validate` accepts it |
 
 An unexported struct gets unexported constructors, `newX` and `mustX`.
@@ -195,7 +203,9 @@ func (x OrderStatus) String() string                   // the underlying string;
 func (x OrderStatus) MarshalText() ([]byte, error)     // checks what it encodes
 func (x *OrderStatus) UnmarshalText(text []byte) error // checks what it decodes
 func (x OrderStatus) MarshalJSON() ([]byte, error)
+func (x OrderStatus) MarshalJSONTo(enc *jsontext.Encoder) error
 func (x *OrderStatus) UnmarshalJSON(data []byte) error
+func (x *OrderStatus) UnmarshalJSONFrom(dec *jsontext.Decoder) error
 func (x OrderStatus) Value() (driver.Value, error)
 func (x *OrderStatus) Scan(src any) error
 func (x OrderStatus) Validate() error                  // whether x is the value of a constant, which kanna-validator calls
@@ -214,7 +224,7 @@ value as it was on any error, and so does JSON null. A NULL column is an error, 
 The type stays a string type with constants, so a `switch` over them, linters checking that a switch is exhaustive, and
 other generators reading the constants work as before. Within the program, `OrderStatus("shiped")` compiles as for any
 string type, so make values with the constants or with `NewOrderStatus`. `Validate` catches a value that did not come
-from either, and so do `MarshalText`, `MarshalJSON`, and `Value`, so that what is written out reads back. The zero
+from either, and so do the methods that write it out, so that what is written out reads back. The zero
 value is no constant either, and writing it out fails saying it is the zero value, as a field left unset is: use a
 `*OrderStatus` where a value may be absent, which JSON null and SQL NULL leave nil, or tag the field `json:",omitzero"`.
 [`kanna-value vet`](#checking-the-constants-given-to-an-enum) finds a constant such as `"shiped"` before the program

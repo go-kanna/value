@@ -218,7 +218,7 @@ func accessorOf(s scan.Struct, f scan.Field) (string, []diag.Diag) {
 // generatedMethods returns the methods generated on a struct holding a value
 // of type t, besides the accessor.
 func generatedMethods(t types.Type) []string {
-	methods := []string{"MarshalJSON", "UnmarshalJSON"}
+	methods := []string{"MarshalJSON", "MarshalJSONTo", "UnmarshalJSON", "UnmarshalJSONFrom"}
 	if sqlConverts(t) {
 		methods = append(methods, "Value", "Scan")
 	}

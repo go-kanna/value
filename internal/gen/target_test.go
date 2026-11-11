@@ -2,7 +2,6 @@ package gen_test
 
 import (
 	"fmt"
-	"go/build"
 	"maps"
 	"slices"
 	"strings"
@@ -216,14 +215,10 @@ func (*Notes) Scan(any) error              { return nil }
 	}
 }
 
-// database/sql knows uuid.UUID, of the standard library from Go 1.27 on, which
-// has no Value or Scan of its own.
+// database/sql knows uuid.UUID, which has no Value or Scan of its own.
 func TestTargets_SQLUUID(t *testing.T) {
 	t.Parallel()
 
-	if !slices.Contains(build.Default.ReleaseTags, "go1.27") {
-		t.Skip("package uuid is in the standard library from Go 1.27 on")
-	}
 	names, diags := targets(t, map[string]string{"model.go": `package test
 
 import "uuid"
