@@ -9,7 +9,7 @@
 
 kanna-value は、値を 1 つ保持する構造体と `validate` メソッドから値オブジェクトを生成します。コンストラクタ、アクセサ、JSON と SQL のメソッドがそろい、値がどこから来ても、ルールを満たすものしか保持しません。定数を持つ string 型を、外部からは定数の値だけを読み込む enum にすることもできます。
 
-[kanna](https://go-kanna.github.io/ja/) コードジェネレータファミリーの 1 つです。Go 1.26 以上が必要です。
+[kanna](https://go-kanna.github.io/ja/) コードジェネレータファミリーの 1 つです。Go 1.27 以上が必要です。
 
 ## インストール
 
@@ -62,7 +62,9 @@ func MustEmail(v string) Email                   // for a constant: panics if v 
 func (x Email) String() string                   // the string held
 func (x Email) IsZero() bool
 func (x Email) MarshalJSON() ([]byte, error)     // checks what it encodes
+func (x Email) MarshalJSONTo(enc *jsontext.Encoder) error
 func (x *Email) UnmarshalJSON(data []byte) error // checks what it decodes
+func (x *Email) UnmarshalJSONFrom(dec *jsontext.Decoder) error
 func (x Email) Value() (driver.Value, error)     // checks what it writes
 func (x *Email) Scan(src any) error              // checks what it scans
 
@@ -70,10 +72,12 @@ func NewCompletedAt(v time.Time) (CompletedAt, error)
 func MustCompletedAt(v time.Time) CompletedAt
 func (x CompletedAt) Time() time.Time
 func (x CompletedAt) Equal(y CompletedAt) bool
-// String, IsZero, MarshalJSON, UnmarshalJSON, Value, and Scan, as for Email
+// String, IsZero, the JSON methods, Value, and Scan, as for Email
 ```
 
-フィールドは非公開なので、パッケージの外で値を得る手段は `NewEmail`、`MustEmail`、`UnmarshalJSON`、`Scan` だけで、どれも `validate` を実行します。`Email` を受け取るコードは、もう一度チェックする必要がありません。ただし、`var e Email` のように Go が `validate` を通さずに作るゼロ値は例外です。ゼロ値は `IsZero` で分かります。`MarshalJSON` と `Value` も `validate` を実行するので、ルールが拒否するゼロ値は、読み戻せずに失敗するのではなく、書き出す時点で、設定し忘れたフィールドのようにゼロ値だと言うエラーで止まります。値がないことのあるフィールドは、JSON の null と SQL の NULL で nil のままになるポインタ `*Email` にするか、`json:",omitzero"` タグを付けます。
+フィールドは非公開なので、パッケージの外で値を得る手段は `NewEmail`、`MustEmail`、`UnmarshalJSON`、`UnmarshalJSONFrom`、`Scan` だけで、どれも `validate` を実行します。`Email` を受け取るコードは、もう一度チェックする必要がありません。ただし、`var e Email` のように Go が `validate` を通さずに作るゼロ値は例外です。ゼロ値は `IsZero` で分かります。値を書き出すメソッドも `validate` を実行するので、ルールが拒否するゼロ値は、読み戻せずに失敗するのではなく、書き出す時点で、設定し忘れたフィールドのようにゼロ値だと言うエラーで止まります。値がないことのあるフィールドは、JSON の null と SQL の NULL で nil のままになるポインタ `*Email` にするか、`json:",omitzero"` タグを付けます。
+
+JSON のメソッドは encoding/json/v2 を使います。encoding/json/v2 も encoding/json も `MarshalJSONTo` と `UnmarshalJSONFrom` を先に呼び、この 2 つは呼び出しのオプションを値に引き継ぎます。そのため `Email` は、同じ呼び出しでその文字列を書くのと同じ形で出力されます。`<` をエスケープするかどうかも、不正な UTF-8 を置き換えるか拒否するかも、文字列と同じです。`MarshalJSON` と `UnmarshalJSON` は、直接呼ぶコードのために残してあり、encoding/json/v2 の既定のオプションを使います。
 
 値オブジェクトは独立した型なので、エラーやドキュメントには付けた名前のまま現れ、他の型と同じようにメソッドを定義できます:
 
@@ -118,7 +122,8 @@ kanna の生成器を 2 つ以上使うなら、必要な順に動かす [`go to
 | `String() string` | 値に `String` があればそれを、なければ fmt の `%v` を使う。`string` の場合はアクセサそのもの |
 | `IsZero() bool` | 値に `IsZero` があればそれを、なければゼロ値との `==` を、スライスとマップでは `== nil` を使う |
 | `Equal(y X) bool` | `time.Time` のように `T` が `Equal(T) bool` を持つ場合のみ生成される |
-| `MarshalJSON`, `UnmarshalJSON` | `validate` が受け入れた場合に、`T` と同じようにエンコードする。`T` としてデコードし、`validate` が受け入れた場合のみ保持する |
+| `MarshalJSON`, `UnmarshalJSON` | `validate` が受け入れた場合に、encoding/json/v2 が `T` をエンコードするのと同じようにエンコードする。`T` としてデコードし、`validate` が受け入れた場合のみ保持する |
+| `MarshalJSONTo`, `UnmarshalJSONFrom` | 同じことを、エンコーダやデコーダのオプションに従って行う |
 | `Value`, `Scan` | database/sql が `T` を両方向に変換できる場合のみ生成される。`validate` が受け入れた場合に、database/sql が `T` を変換するのと同じように変換する。`T` としてスキャンし、`validate` が受け入れた場合のみ保持する |
 
 非公開の構造体には、非公開のコンストラクタ `newX` と `mustX` が生成されます。
@@ -163,7 +168,9 @@ func (x OrderStatus) String() string                   // the underlying string;
 func (x OrderStatus) MarshalText() ([]byte, error)     // checks what it encodes
 func (x *OrderStatus) UnmarshalText(text []byte) error // checks what it decodes
 func (x OrderStatus) MarshalJSON() ([]byte, error)
+func (x OrderStatus) MarshalJSONTo(enc *jsontext.Encoder) error
 func (x *OrderStatus) UnmarshalJSON(data []byte) error
+func (x *OrderStatus) UnmarshalJSONFrom(dec *jsontext.Decoder) error
 func (x OrderStatus) Value() (driver.Value, error)
 func (x *OrderStatus) Scan(src any) error
 func (x OrderStatus) Validate() error                  // whether x is the value of a constant, which kanna-validator calls
@@ -175,7 +182,7 @@ func (x OrderStatus) Validate() error                  // whether x is the value
 
 コンストラクタと、デコード、スキャン、エンコード、書き出し、検証のメソッドは、どの定数でもない値を `rule.Fail("inclusion")` で拒否します（kanna-validator の `oneof` が報告するのと同じコード）。デコードとスキャンは、エラーの場合も JSON の null の場合も、値を変更しません。NULL のカラムは、値オブジェクトと同じくエラーになります。
 
-型は定数を持つ string 型のままなので、定数に対する `switch`、switch の網羅性を調べる linter、定数を読み取る他のジェネレータは、これまでどおり動きます。プログラム内では、他の string 型と同じく `OrderStatus("shiped")` もコンパイルが通るので、値は定数か `NewOrderStatus` で作ってください。そのどちらからも作られなかった値は `Validate` で検出でき、`MarshalText`、`MarshalJSON`、`Value` も同じく拒否するので、書き出したものは読み戻せます。ゼロ値も定数ではないので、書き出すと、設定し忘れたフィールドのようにゼロ値だと言うエラーで止まります。値がない場合があるなら、JSON の null と SQL の NULL で nil のままになる `*OrderStatus` を使うか、`json:",omitzero"` タグを付けてください。`"shiped"` のような定数は、[`kanna-value vet`](#enum-に渡す定数を検査する) がプログラムを動かす前に見つけます。
+型は定数を持つ string 型のままなので、定数に対する `switch`、switch の網羅性を調べる linter、定数を読み取る他のジェネレータは、これまでどおり動きます。プログラム内では、他の string 型と同じく `OrderStatus("shiped")` もコンパイルが通るので、値は定数か `NewOrderStatus` で作ってください。そのどちらからも作られなかった値は `Validate` で検出でき、値を書き出すメソッドも同じく拒否するので、書き出したものは読み戻せます。ゼロ値も定数ではないので、書き出すと、設定し忘れたフィールドのようにゼロ値だと言うエラーで止まります。値がない場合があるなら、JSON の null と SQL の NULL で nil のままになる `*OrderStatus` を使うか、`json:",omitzero"` タグを付けてください。`"shiped"` のような定数は、[`kanna-value vet`](#enum-に渡す定数を検査する) がプログラムを動かす前に見つけます。
 
 定数 1 つが enum の値 1 つで、enum を読む生成器はそれを 1 つずつ扱います。そのため、同じ値を持つ 2 つの定数は、コピーの誤りと同じく生成を止めます。既定値のように、ある値に別の名前を付けたいときは、関数で書きます:
 

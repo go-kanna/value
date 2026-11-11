@@ -172,31 +172,45 @@ func (w writer) writeEqual() {
 }
 
 func (w writer) writeJSON() {
-	json := w.f.Import("encoding/json", "json")
+	json := w.f.Import("encoding/json/v2", "json")
+	jsontext := w.f.Import("encoding/json/jsontext", "jsontext")
+	absent := "use a *" + w.Name + " or tag the field omitzero"
 
 	sc := w.f.Scope()
 	x, err := sc.Name("x"), sc.Name("err")
-	w.doc(fmt.Sprintf("MarshalJSON encodes the %s that %s holds as encoding/json encodes it, if the validate "+
+	w.doc(fmt.Sprintf("MarshalJSON encodes the %s that %s holds as encoding/json/v2 encodes it, if the validate "+
 		"method of %s accepts it, so that UnmarshalJSON reads it back: the zero %s is made without it.",
 		w.desc, x, w.Name, w.Name))
 	fmt.Fprintf(w.f, "func (%s %s) MarshalJSON() ([]byte, error) {\n", x, w.Name)
-	w.validated(x, err, "use a *"+w.Name+" or tag the field omitzero")
+	w.validated(x, err, absent, "nil, ")
 	fmt.Fprintf(w.f, "return %s.Marshal(%s.%s)\n", json, x, w.field.Name)
 	fmt.Fprintf(w.f, "}\n\n")
 
 	sc = w.f.Scope()
+	x, enc, err := sc.Name("x"), sc.Name("enc"), sc.Name("err")
+	w.doc(fmt.Sprintf("MarshalJSONTo encodes the %s that %s holds to %s as MarshalJSON does, with the options "+
+		"of %s, so that %s is written as its %s would be.", w.desc, x, enc, enc, x, w.desc))
+	fmt.Fprintf(w.f, "func (%s %s) MarshalJSONTo(%s *%s.Encoder) error {\n", x, w.Name, enc, jsontext)
+	w.validated(x, err, absent, "")
+	fmt.Fprintf(w.f, "return %s.MarshalEncode(%s, %s.%s)\n", json, enc, x, w.field.Name)
+	fmt.Fprintf(w.f, "}\n\n")
+
+	sc = w.f.Scope()
 	x, data, v, y, err := sc.Name("x"), sc.Name("data"), sc.Name("v"), sc.Name("y"), sc.Name("err")
-	w.doc(fmt.Sprintf("UnmarshalJSON decodes %s as encoding/json decodes a value of %s, and keeps the value "+
+	w.doc(fmt.Sprintf("UnmarshalJSON decodes %s as encoding/json/v2 decodes a value of %s, and keeps the value "+
 		"only if the validate method of %s accepts it. JSON null, like an error, leaves %s as it was.",
 		data, w.desc, w.Name, x))
 	fmt.Fprintf(w.f, "func (%s *%s) UnmarshalJSON(%s []byte) error {\n", x, w.Name, data)
-	fmt.Fprintf(w.f, "if string(%s) == \"null\" {\n", data)
-	fmt.Fprintf(w.f, "return nil\n")
-	fmt.Fprintf(w.f, "}\n")
-	fmt.Fprintf(w.f, "var %s %s\n", v, w.typ)
-	fmt.Fprintf(w.f, "if %s := %s.Unmarshal(%s, &%s); %s != nil {\n", err, json, data, v, err)
-	fmt.Fprintf(w.f, "return %s\n", err)
-	fmt.Fprintf(w.f, "}\n")
+	unmarshalBytes(w.f, json, data, v, err, w.typ)
+	keep(w.f, w.newFunc, x, y, err, v)
+	fmt.Fprintf(w.f, "}\n\n")
+
+	sc = w.f.Scope()
+	x, dec, v, y, err := sc.Name("x"), sc.Name("dec"), sc.Name("v"), sc.Name("y"), sc.Name("err")
+	w.doc(fmt.Sprintf("UnmarshalJSONFrom decodes a value of %s from %s as UnmarshalJSON does, with the options "+
+		"of %s.", w.desc, dec, dec))
+	fmt.Fprintf(w.f, "func (%s *%s) UnmarshalJSONFrom(%s *%s.Decoder) error {\n", x, w.Name, dec, jsontext)
+	unmarshalDecode(w.f, json, jsontext, dec, v, err, w.typ)
 	keep(w.f, w.newFunc, x, y, err, v)
 	fmt.Fprintf(w.f, "}\n\n")
 }
@@ -214,7 +228,7 @@ func (w writer) writeSQL() {
 	}
 	w.doc(doc)
 	fmt.Fprintf(w.f, "func (%s %s) Value() (%s.Value, error) {\n", x, w.Name, driver)
-	w.validated(x, err, "use a *"+w.Name)
+	w.validated(x, err, "use a *"+w.Name, "nil, ")
 	value := x + "." + w.field.Name
 	if w.bytes {
 		v := sc.Name("v")
@@ -246,19 +260,20 @@ func (w writer) writeSQL() {
 }
 
 // validated starts a method writing out the value x holds: it returns err,
-// with nothing written, unless the validate method accepts the value. The zero
-// value is told apart where IsZero can tell it, as a value left unset, and
-// absent says what to do where a value may be absent instead.
-func (w writer) validated(x, err, absent string) {
+// after the other results before, with nothing written, unless the validate
+// method accepts the value. The zero value is told apart where IsZero can tell
+// it, as a value left unset, and absent says what to do where a value may be
+// absent instead.
+func (w writer) validated(x, err, absent, before string) {
 	fmt.Fprintf(w.f, "if %s := %s.validate(%s.%s); %s != nil {\n", err, x, x, w.field.Name, err)
 	if w.zero != zeroNone {
 		fmt.Fprintf(w.f, "if %s.IsZero() {\n", x)
-		fmt.Fprintf(w.f, "return nil, %s.Errorf(%q, %s)\n", w.f.Import("fmt", "fmt"),
+		fmt.Fprintf(w.f, "return %s%s.Errorf(%q, %s)\n", before, w.f.Import("fmt", "fmt"),
 			w.pkgName+": cannot write the zero "+w.Name+", which its rule rejects; set it, or, "+
 				"where a value may be absent, "+absent+": %w", err)
 		fmt.Fprintf(w.f, "}\n")
 	}
-	fmt.Fprintf(w.f, "return nil, %s\n", err)
+	fmt.Fprintf(w.f, "return %s%s\n", before, err)
 	fmt.Fprintf(w.f, "}\n")
 }
 
@@ -277,6 +292,31 @@ func keep(f *gofile.File, newFunc, x, y, err, value string) {
 	fmt.Fprintf(f, "}\n")
 	fmt.Fprintf(f, "*%s = %s\n", x, y)
 	fmt.Fprintf(f, "return nil\n")
+}
+
+// unmarshalBytes starts UnmarshalJSON: it returns nil for JSON null, and
+// otherwise decodes data into v, a new variable of type typ, through json, the
+// name encoding/json/v2 is imported as, returning err if that fails.
+func unmarshalBytes(f *gofile.File, json, data, v, err, typ string) {
+	fmt.Fprintf(f, "if string(%s) == \"null\" {\n", data)
+	fmt.Fprintf(f, "return nil\n")
+	fmt.Fprintf(f, "}\n")
+	fmt.Fprintf(f, "var %s %s\n", v, typ)
+	fmt.Fprintf(f, "if %s := %s.Unmarshal(%s, &%s); %s != nil {\n", err, json, data, v, err)
+	fmt.Fprintf(f, "return %s\n", err)
+	fmt.Fprintf(f, "}\n")
+}
+
+// unmarshalDecode starts UnmarshalJSONFrom as unmarshalBytes starts
+// UnmarshalJSON, reading the value from dec, with JSON null skipped.
+func unmarshalDecode(f *gofile.File, json, jsontext, dec, v, err, typ string) {
+	fmt.Fprintf(f, "if %s.PeekKind() == %s.KindNull {\n", dec, jsontext)
+	fmt.Fprintf(f, "return %s.SkipValue()\n", dec)
+	fmt.Fprintf(f, "}\n")
+	fmt.Fprintf(f, "var %s %s\n", v, typ)
+	fmt.Fprintf(f, "if %s := %s.UnmarshalDecode(%s, &%s); %s != nil {\n", err, json, dec, v, err)
+	fmt.Fprintf(f, "return %s\n", err)
+	fmt.Fprintf(f, "}\n")
 }
 
 // enumWriter writes the declarations of one enum.
@@ -325,7 +365,7 @@ func (w enumWriter) writeMarshalText() {
 	writeDoc(w.f, fmt.Sprintf("MarshalText returns the underlying string of %s if Validate accepts it, "+
 		"so that UnmarshalText reads it back.", x))
 	fmt.Fprintf(w.f, "func (%s %s) MarshalText() ([]byte, error) {\n", x, w.Name)
-	w.validated(x, err, "use a *"+w.Name)
+	w.validated(x, err, "use a *"+w.Name, "nil, ")
 	fmt.Fprintf(w.f, "return []byte(%s), nil\n", x)
 	fmt.Fprintf(w.f, "}\n\n")
 }
@@ -342,15 +382,26 @@ func (w enumWriter) writeUnmarshalText() {
 }
 
 func (w enumWriter) writeJSON() {
-	json := w.f.Import("encoding/json", "json")
+	json := w.f.Import("encoding/json/v2", "json")
+	jsontext := w.f.Import("encoding/json/jsontext", "jsontext")
+	absent := "use a *" + w.Name + " or tag the field omitzero"
 
 	sc := w.f.Scope()
 	x, err := sc.Name("x"), sc.Name("err")
 	writeDoc(w.f, fmt.Sprintf("MarshalJSON encodes the underlying string of %s as a JSON string if Validate "+
 		"accepts it, so that UnmarshalJSON reads it back.", x))
 	fmt.Fprintf(w.f, "func (%s %s) MarshalJSON() ([]byte, error) {\n", x, w.Name)
-	w.validated(x, err, "use a *"+w.Name+" or tag the field omitzero")
+	w.validated(x, err, absent, "nil, ")
 	fmt.Fprintf(w.f, "return %s.Marshal(string(%s))\n", json, x)
+	fmt.Fprintf(w.f, "}\n\n")
+
+	sc = w.f.Scope()
+	x, enc, err := sc.Name("x"), sc.Name("enc"), sc.Name("err")
+	writeDoc(w.f, fmt.Sprintf("MarshalJSONTo encodes the underlying string of %s to %s as MarshalJSON does, "+
+		"with the options of %s.", x, enc, enc))
+	fmt.Fprintf(w.f, "func (%s %s) MarshalJSONTo(%s *%s.Encoder) error {\n", x, w.Name, enc, jsontext)
+	w.validated(x, err, absent, "")
+	fmt.Fprintf(w.f, "return %s.MarshalEncode(%s, string(%s))\n", json, enc, x)
 	fmt.Fprintf(w.f, "}\n\n")
 
 	sc = w.f.Scope()
@@ -358,13 +409,16 @@ func (w enumWriter) writeJSON() {
 	writeDoc(w.f, fmt.Sprintf("UnmarshalJSON decodes a JSON string, and sets %s to it if %s accepts it. "+
 		"JSON null, like an error, leaves %s as it was.", x, w.newFunc, x))
 	fmt.Fprintf(w.f, "func (%s *%s) UnmarshalJSON(%s []byte) error {\n", x, w.Name, data)
-	fmt.Fprintf(w.f, "if string(%s) == \"null\" {\n", data)
-	fmt.Fprintf(w.f, "return nil\n")
-	fmt.Fprintf(w.f, "}\n")
-	fmt.Fprintf(w.f, "var %s string\n", v)
-	fmt.Fprintf(w.f, "if %s := %s.Unmarshal(%s, &%s); %s != nil {\n", err, json, data, v, err)
-	fmt.Fprintf(w.f, "return %s\n", err)
-	fmt.Fprintf(w.f, "}\n")
+	unmarshalBytes(w.f, json, data, v, err, "string")
+	keep(w.f, w.newFunc, x, y, err, v)
+	fmt.Fprintf(w.f, "}\n\n")
+
+	sc = w.f.Scope()
+	x, dec, v, y, err := sc.Name("x"), sc.Name("dec"), sc.Name("v"), sc.Name("y"), sc.Name("err")
+	writeDoc(w.f, fmt.Sprintf("UnmarshalJSONFrom decodes a JSON string from %s as UnmarshalJSON does, "+
+		"with the options of %s.", dec, dec))
+	fmt.Fprintf(w.f, "func (%s *%s) UnmarshalJSONFrom(%s *%s.Decoder) error {\n", x, w.Name, dec, jsontext)
+	unmarshalDecode(w.f, json, jsontext, dec, v, err, "string")
 	keep(w.f, w.newFunc, x, y, err, v)
 	fmt.Fprintf(w.f, "}\n\n")
 }
@@ -377,22 +431,23 @@ func (w enumWriter) writeValue() {
 	writeDoc(w.f, fmt.Sprintf("Value returns the underlying string of %s for a database driver if Validate "+
 		"accepts it, so that Scan reads it back.", x))
 	fmt.Fprintf(w.f, "func (%s %s) Value() (%s.Value, error) {\n", x, w.Name, driver)
-	w.validated(x, err, "use a *"+w.Name)
+	w.validated(x, err, "use a *"+w.Name, "nil, ")
 	fmt.Fprintf(w.f, "return string(%s), nil\n", x)
 	fmt.Fprintf(w.f, "}\n\n")
 }
 
-// validated starts a method writing out x: it returns err, with nothing
-// written, unless Validate accepts x. The zero value is told apart, as a value
-// left unset, and absent says what to do where a value may be absent instead.
-func (w enumWriter) validated(x, err, absent string) {
+// validated starts a method writing out x: it returns err, after the other
+// results before, with nothing written, unless Validate accepts x. The zero
+// value is told apart, as a value left unset, and absent says what to do where
+// a value may be absent instead.
+func (w enumWriter) validated(x, err, absent, before string) {
 	fmt.Fprintf(w.f, "if %s := %s.Validate(); %s != nil {\n", err, x, err)
 	fmt.Fprintf(w.f, "if %s == \"\" {\n", x)
-	fmt.Fprintf(w.f, "return nil, %s.Errorf(%q, %s)\n", w.f.Import("fmt", "fmt"),
+	fmt.Fprintf(w.f, "return %s%s.Errorf(%q, %s)\n", before, w.f.Import("fmt", "fmt"),
 		w.pkgName+": cannot write the zero "+w.Name+", which its rule rejects; set it, or, "+
 			"where a value may be absent, "+absent+": %w", err)
 	fmt.Fprintf(w.f, "}\n")
-	fmt.Fprintf(w.f, "return nil, %s\n", err)
+	fmt.Fprintf(w.f, "return %s%s\n", before, err)
 	fmt.Fprintf(w.f, "}\n")
 }
 

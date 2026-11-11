@@ -53,7 +53,9 @@ type Raw struct{ r raw }
 func (Raw) validate(raw) error { return nil }
 `})
 
-	declared := []string{"x", "v", "err", "y", "data", "src", "json", "slices", "driver", "sql", "errors", "fmt"}
+	declared := []string{
+		"x", "v", "err", "y", "data", "src", "enc", "dec", "json", "jsontext", "slices", "driver", "sql", "errors", "fmt",
+	}
 	got, err := gen.Emit(pkg.Fset, []*packages.Package{pkg}, declared)
 	if err != nil {
 		t.Fatalf("emit: %v\n%s", err, got)
@@ -65,6 +67,10 @@ func (Raw) validate(raw) error { return nil }
 		"if err2 := (Raw{}).validate(v2); err2 != nil {",
 		"func (x2 *Raw) UnmarshalJSON(data2 []byte) error {",
 		"if err2 := json2.Unmarshal(data2, &v2); err2 != nil {",
+		"func (x2 Raw) MarshalJSONTo(enc2 *jsontext2.Encoder) error {",
+		"return json2.MarshalEncode(enc2, x2.r)",
+		"func (x2 *Raw) UnmarshalJSONFrom(dec2 *jsontext2.Decoder) error {",
+		"if err2 := json2.UnmarshalDecode(dec2, &v2); err2 != nil {",
 		"func (x2 Raw) Value() (driver2.Value, error) {",
 		"v2 := x2.r",
 		"return nil, fmt2.Errorf(",

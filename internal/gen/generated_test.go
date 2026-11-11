@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 	"errors"
 	"fmt"
 	"slices"
@@ -236,6 +238,74 @@ func TestGenerated_JSON(t *testing.T) {
 	if b, err := json.Marshal(emit.Count{}); err != nil || string(b) != "0" {
 		t.Errorf("Marshal(Count{}) = %s, %v; want 0, which the rule accepts", b, err)
 	}
+}
+
+// A value type is written as what it holds would be, whatever encoding/json/v2
+// is asked to do with it, and encoding/json too.
+func TestGenerated_JSONAsHeld(t *testing.T) {
+	t.Parallel()
+
+	type held struct {
+		Tags  []string
+		Count int
+	}
+	type value struct {
+		Tags  emit.Tags
+		Count emit.Count
+	}
+	marshals := []struct {
+		name    string
+		marshal func(any) ([]byte, error)
+	}{
+		{"v2", func(v any) ([]byte, error) { return jsonv2.Marshal(v) }},
+		{"v2 with options", func(v any) ([]byte, error) {
+			return jsonv2.Marshal(v, jsontext.EscapeForHTML(true), jsontext.AllowInvalidUTF8(true),
+				jsonv2.StringifyNumbers(true))
+		}},
+		{"v1", json.Marshal},
+	}
+	for _, in := range [][]string{{"<a&b>"}, {"\xff"}} {
+		for _, m := range marshals {
+			want, wantErr := m.marshal(held{Tags: in, Count: 1})
+			got, err := m.marshal(value{Tags: emit.MustTags(in), Count: emit.MustCount(1)})
+			if string(got) != string(want) || (err != nil) != (wantErr != nil) {
+				t.Errorf("%s: Marshal of %q = %s, %v; want %s, %v as the []string", m.name, in, got, err, want, wantErr)
+			}
+		}
+	}
+
+	var got struct{ Email emit.Email }
+	got.Email = emit.MustEmail("kept@example.com")
+	if err := jsonv2.Unmarshal([]byte(`{"Email":null}`), &got); err != nil || got.Email.String() != "kept@example.com" {
+		t.Errorf("Unmarshal of null = %v, leaving %v; want nil, leaving it as it was", err, got.Email)
+	}
+	err := jsonv2.Unmarshal([]byte(`{"Email":"not an address"}`), &got)
+	wantCode(t, err, "email")
+	_, err = jsonv2.Marshal(emit.Email{})
+	wantZero(t, err, "emit: cannot write the zero Email, which its rule rejects; set it, or, "+
+		"where a value may be absent, use a *Email or tag the field omitzero: rule: email")
+}
+
+func TestGenerated_EnumJSONv2(t *testing.T) {
+	t.Parallel()
+
+	b, err := jsonv2.Marshal(order{Status: emit.StatusShipped})
+	if want := `{"status":"shipped","previous":null,"counts":{}}`; err != nil || string(b) != want {
+		t.Errorf("Marshal = %s, %v; want %s", b, err, want)
+	}
+
+	got := order{Status: emit.StatusPlaced}
+	if err := jsonv2.Unmarshal([]byte(`{"status":null}`), &got); err != nil || got.Status != emit.StatusPlaced {
+		t.Errorf("Unmarshal of null = %v, leaving %q; want nil, leaving it as it was", err, got.Status)
+	}
+	err = jsonv2.Unmarshal([]byte(`{"status":"refunded"}`), &got)
+	wantCode(t, err, "inclusion")
+	if got.Status != emit.StatusPlaced {
+		t.Errorf("Status = %q after an error, want it left as %q", got.Status, emit.StatusPlaced)
+	}
+	_, err = jsonv2.Marshal(order{})
+	wantZero(t, err, "emit: cannot write the zero Status, which its rule rejects; set it, or, "+
+		"where a value may be absent, use a *Status or tag the field omitzero: rule: inclusion")
 }
 
 func TestGenerated_SQL(t *testing.T) {

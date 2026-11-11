@@ -5,7 +5,8 @@ package emit
 import (
 	"database/sql"
 	"database/sql/driver"
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"errors"
 	"fmt"
 	"maps"
@@ -56,9 +57,9 @@ func (x CompletedAt) Equal(y CompletedAt) bool {
 	return x.t.Equal(y.t)
 }
 
-// MarshalJSON encodes the time.Time that x holds as encoding/json encodes it,
-// if the validate method of CompletedAt accepts it, so that UnmarshalJSON reads
-// it back: the zero CompletedAt is made without it.
+// MarshalJSON encodes the time.Time that x holds as encoding/json/v2 encodes
+// it, if the validate method of CompletedAt accepts it, so that UnmarshalJSON
+// reads it back: the zero CompletedAt is made without it.
 func (x CompletedAt) MarshalJSON() ([]byte, error) {
 	if err := x.validate(x.t); err != nil {
 		if x.IsZero() {
@@ -69,15 +70,45 @@ func (x CompletedAt) MarshalJSON() ([]byte, error) {
 	return json.Marshal(x.t)
 }
 
-// UnmarshalJSON decodes data as encoding/json decodes a value of time.Time, and
-// keeps the value only if the validate method of CompletedAt accepts it. JSON
-// null, like an error, leaves x as it was.
+// MarshalJSONTo encodes the time.Time that x holds to enc as MarshalJSON does,
+// with the options of enc, so that x is written as its time.Time would be.
+func (x CompletedAt) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if err := x.validate(x.t); err != nil {
+		if x.IsZero() {
+			return fmt.Errorf("emit: cannot write the zero CompletedAt, which its rule rejects; set it, or, where a value may be absent, use a *CompletedAt or tag the field omitzero: %w", err)
+		}
+		return err
+	}
+	return json.MarshalEncode(enc, x.t)
+}
+
+// UnmarshalJSON decodes data as encoding/json/v2 decodes a value of time.Time,
+// and keeps the value only if the validate method of CompletedAt accepts it.
+// JSON null, like an error, leaves x as it was.
 func (x *CompletedAt) UnmarshalJSON(data []byte) error {
 	if string(data) == "null" {
 		return nil
 	}
 	var v time.Time
 	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	y, err := NewCompletedAt(v)
+	if err != nil {
+		return err
+	}
+	*x = y
+	return nil
+}
+
+// UnmarshalJSONFrom decodes a value of time.Time from dec as UnmarshalJSON
+// does, with the options of dec.
+func (x *CompletedAt) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if dec.PeekKind() == jsontext.KindNull {
+		return dec.SkipValue()
+	}
+	var v time.Time
+	if err := json.UnmarshalDecode(dec, &v); err != nil {
 		return err
 	}
 	y, err := NewCompletedAt(v)
@@ -152,9 +183,9 @@ func (x Email) IsZero() bool {
 	return x == Email{}
 }
 
-// MarshalJSON encodes the string that x holds as encoding/json encodes it, if
-// the validate method of Email accepts it, so that UnmarshalJSON reads it back:
-// the zero Email is made without it.
+// MarshalJSON encodes the string that x holds as encoding/json/v2 encodes it,
+// if the validate method of Email accepts it, so that UnmarshalJSON reads it
+// back: the zero Email is made without it.
 func (x Email) MarshalJSON() ([]byte, error) {
 	if err := x.validate(x.s); err != nil {
 		if x.IsZero() {
@@ -165,7 +196,19 @@ func (x Email) MarshalJSON() ([]byte, error) {
 	return json.Marshal(x.s)
 }
 
-// UnmarshalJSON decodes data as encoding/json decodes a value of string, and
+// MarshalJSONTo encodes the string that x holds to enc as MarshalJSON does,
+// with the options of enc, so that x is written as its string would be.
+func (x Email) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if err := x.validate(x.s); err != nil {
+		if x.IsZero() {
+			return fmt.Errorf("emit: cannot write the zero Email, which its rule rejects; set it, or, where a value may be absent, use a *Email or tag the field omitzero: %w", err)
+		}
+		return err
+	}
+	return json.MarshalEncode(enc, x.s)
+}
+
+// UnmarshalJSON decodes data as encoding/json/v2 decodes a value of string, and
 // keeps the value only if the validate method of Email accepts it. JSON null,
 // like an error, leaves x as it was.
 func (x *Email) UnmarshalJSON(data []byte) error {
@@ -174,6 +217,24 @@ func (x *Email) UnmarshalJSON(data []byte) error {
 	}
 	var v string
 	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	y, err := NewEmail(v)
+	if err != nil {
+		return err
+	}
+	*x = y
+	return nil
+}
+
+// UnmarshalJSONFrom decodes a value of string from dec as UnmarshalJSON does,
+// with the options of dec.
+func (x *Email) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if dec.PeekKind() == jsontext.KindNull {
+		return dec.SkipValue()
+	}
+	var v string
+	if err := json.UnmarshalDecode(dec, &v); err != nil {
 		return err
 	}
 	y, err := NewEmail(v)
@@ -250,9 +311,9 @@ func (x Count) IsZero() bool {
 	return x == Count{}
 }
 
-// MarshalJSON encodes the int that x holds as encoding/json encodes it, if the
-// validate method of Count accepts it, so that UnmarshalJSON reads it back: the
-// zero Count is made without it.
+// MarshalJSON encodes the int that x holds as encoding/json/v2 encodes it, if
+// the validate method of Count accepts it, so that UnmarshalJSON reads it back:
+// the zero Count is made without it.
 func (x Count) MarshalJSON() ([]byte, error) {
 	if err := x.validate(x.n); err != nil {
 		if x.IsZero() {
@@ -263,15 +324,45 @@ func (x Count) MarshalJSON() ([]byte, error) {
 	return json.Marshal(x.n)
 }
 
-// UnmarshalJSON decodes data as encoding/json decodes a value of int, and keeps
-// the value only if the validate method of Count accepts it. JSON null, like an
-// error, leaves x as it was.
+// MarshalJSONTo encodes the int that x holds to enc as MarshalJSON does, with
+// the options of enc, so that x is written as its int would be.
+func (x Count) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if err := x.validate(x.n); err != nil {
+		if x.IsZero() {
+			return fmt.Errorf("emit: cannot write the zero Count, which its rule rejects; set it, or, where a value may be absent, use a *Count or tag the field omitzero: %w", err)
+		}
+		return err
+	}
+	return json.MarshalEncode(enc, x.n)
+}
+
+// UnmarshalJSON decodes data as encoding/json/v2 decodes a value of int, and
+// keeps the value only if the validate method of Count accepts it. JSON null,
+// like an error, leaves x as it was.
 func (x *Count) UnmarshalJSON(data []byte) error {
 	if string(data) == "null" {
 		return nil
 	}
 	var v int
 	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	y, err := NewCount(v)
+	if err != nil {
+		return err
+	}
+	*x = y
+	return nil
+}
+
+// UnmarshalJSONFrom decodes a value of int from dec as UnmarshalJSON does, with
+// the options of dec.
+func (x *Count) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if dec.PeekKind() == jsontext.KindNull {
+		return dec.SkipValue()
+	}
+	var v int
+	if err := json.UnmarshalDecode(dec, &v); err != nil {
 		return err
 	}
 	y, err := NewCount(v)
@@ -349,7 +440,7 @@ func (x price) IsZero() bool {
 	return x == price{}
 }
 
-// MarshalJSON encodes the cents that x holds as encoding/json encodes it, if
+// MarshalJSON encodes the cents that x holds as encoding/json/v2 encodes it, if
 // the validate method of price accepts it, so that UnmarshalJSON reads it back:
 // the zero price is made without it.
 func (x price) MarshalJSON() ([]byte, error) {
@@ -362,7 +453,19 @@ func (x price) MarshalJSON() ([]byte, error) {
 	return json.Marshal(x.c)
 }
 
-// UnmarshalJSON decodes data as encoding/json decodes a value of cents, and
+// MarshalJSONTo encodes the cents that x holds to enc as MarshalJSON does, with
+// the options of enc, so that x is written as its cents would be.
+func (x price) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if err := x.validate(x.c); err != nil {
+		if x.IsZero() {
+			return fmt.Errorf("emit: cannot write the zero price, which its rule rejects; set it, or, where a value may be absent, use a *price or tag the field omitzero: %w", err)
+		}
+		return err
+	}
+	return json.MarshalEncode(enc, x.c)
+}
+
+// UnmarshalJSON decodes data as encoding/json/v2 decodes a value of cents, and
 // keeps the value only if the validate method of price accepts it. JSON null,
 // like an error, leaves x as it was.
 func (x *price) UnmarshalJSON(data []byte) error {
@@ -371,6 +474,24 @@ func (x *price) UnmarshalJSON(data []byte) error {
 	}
 	var v cents
 	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	y, err := newPrice(v)
+	if err != nil {
+		return err
+	}
+	*x = y
+	return nil
+}
+
+// UnmarshalJSONFrom decodes a value of cents from dec as UnmarshalJSON does,
+// with the options of dec.
+func (x *price) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if dec.PeekKind() == jsontext.KindNull {
+		return dec.SkipValue()
+	}
+	var v cents
+	if err := json.UnmarshalDecode(dec, &v); err != nil {
 		return err
 	}
 	y, err := newPrice(v)
@@ -448,9 +569,9 @@ func (x Tags) IsZero() bool {
 	return x.t == nil
 }
 
-// MarshalJSON encodes the tags that x holds as encoding/json encodes it, if the
-// validate method of Tags accepts it, so that UnmarshalJSON reads it back: the
-// zero Tags is made without it.
+// MarshalJSON encodes the tags that x holds as encoding/json/v2 encodes it, if
+// the validate method of Tags accepts it, so that UnmarshalJSON reads it back:
+// the zero Tags is made without it.
 func (x Tags) MarshalJSON() ([]byte, error) {
 	if err := x.validate(x.t); err != nil {
 		if x.IsZero() {
@@ -461,7 +582,19 @@ func (x Tags) MarshalJSON() ([]byte, error) {
 	return json.Marshal(x.t)
 }
 
-// UnmarshalJSON decodes data as encoding/json decodes a value of tags, and
+// MarshalJSONTo encodes the tags that x holds to enc as MarshalJSON does, with
+// the options of enc, so that x is written as its tags would be.
+func (x Tags) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if err := x.validate(x.t); err != nil {
+		if x.IsZero() {
+			return fmt.Errorf("emit: cannot write the zero Tags, which its rule rejects; set it, or, where a value may be absent, use a *Tags or tag the field omitzero: %w", err)
+		}
+		return err
+	}
+	return json.MarshalEncode(enc, x.t)
+}
+
+// UnmarshalJSON decodes data as encoding/json/v2 decodes a value of tags, and
 // keeps the value only if the validate method of Tags accepts it. JSON null,
 // like an error, leaves x as it was.
 func (x *Tags) UnmarshalJSON(data []byte) error {
@@ -470,6 +603,24 @@ func (x *Tags) UnmarshalJSON(data []byte) error {
 	}
 	var v tags
 	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	y, err := NewTags(v)
+	if err != nil {
+		return err
+	}
+	*x = y
+	return nil
+}
+
+// UnmarshalJSONFrom decodes a value of tags from dec as UnmarshalJSON does,
+// with the options of dec.
+func (x *Tags) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if dec.PeekKind() == jsontext.KindNull {
+		return dec.SkipValue()
+	}
+	var v tags
+	if err := json.UnmarshalDecode(dec, &v); err != nil {
 		return err
 	}
 	y, err := NewTags(v)
@@ -516,8 +667,8 @@ func (x Payload) IsZero() bool {
 	return x.p == nil
 }
 
-// MarshalJSON encodes the payload that x holds as encoding/json encodes it, if
-// the validate method of Payload accepts it, so that UnmarshalJSON reads it
+// MarshalJSON encodes the payload that x holds as encoding/json/v2 encodes it,
+// if the validate method of Payload accepts it, so that UnmarshalJSON reads it
 // back: the zero Payload is made without it.
 func (x Payload) MarshalJSON() ([]byte, error) {
 	if err := x.validate(x.p); err != nil {
@@ -529,15 +680,45 @@ func (x Payload) MarshalJSON() ([]byte, error) {
 	return json.Marshal(x.p)
 }
 
-// UnmarshalJSON decodes data as encoding/json decodes a value of payload, and
-// keeps the value only if the validate method of Payload accepts it. JSON null,
-// like an error, leaves x as it was.
+// MarshalJSONTo encodes the payload that x holds to enc as MarshalJSON does,
+// with the options of enc, so that x is written as its payload would be.
+func (x Payload) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if err := x.validate(x.p); err != nil {
+		if x.IsZero() {
+			return fmt.Errorf("emit: cannot write the zero Payload, which its rule rejects; set it, or, where a value may be absent, use a *Payload or tag the field omitzero: %w", err)
+		}
+		return err
+	}
+	return json.MarshalEncode(enc, x.p)
+}
+
+// UnmarshalJSON decodes data as encoding/json/v2 decodes a value of payload,
+// and keeps the value only if the validate method of Payload accepts it. JSON
+// null, like an error, leaves x as it was.
 func (x *Payload) UnmarshalJSON(data []byte) error {
 	if string(data) == "null" {
 		return nil
 	}
 	var v payload
 	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	y, err := NewPayload(v)
+	if err != nil {
+		return err
+	}
+	*x = y
+	return nil
+}
+
+// UnmarshalJSONFrom decodes a value of payload from dec as UnmarshalJSON does,
+// with the options of dec.
+func (x *Payload) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if dec.PeekKind() == jsontext.KindNull {
+		return dec.SkipValue()
+	}
+	var v payload
+	if err := json.UnmarshalDecode(dec, &v); err != nil {
 		return err
 	}
 	y, err := NewPayload(v)
@@ -622,8 +803,8 @@ func (x Labels) IsZero() bool {
 	return x.l == nil
 }
 
-// MarshalJSON encodes the labels that x holds as encoding/json encodes it, if
-// the validate method of Labels accepts it, so that UnmarshalJSON reads it
+// MarshalJSON encodes the labels that x holds as encoding/json/v2 encodes it,
+// if the validate method of Labels accepts it, so that UnmarshalJSON reads it
 // back: the zero Labels is made without it.
 func (x Labels) MarshalJSON() ([]byte, error) {
 	if err := x.validate(x.l); err != nil {
@@ -635,7 +816,19 @@ func (x Labels) MarshalJSON() ([]byte, error) {
 	return json.Marshal(x.l)
 }
 
-// UnmarshalJSON decodes data as encoding/json decodes a value of labels, and
+// MarshalJSONTo encodes the labels that x holds to enc as MarshalJSON does,
+// with the options of enc, so that x is written as its labels would be.
+func (x Labels) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if err := x.validate(x.l); err != nil {
+		if x.IsZero() {
+			return fmt.Errorf("emit: cannot write the zero Labels, which its rule rejects; set it, or, where a value may be absent, use a *Labels or tag the field omitzero: %w", err)
+		}
+		return err
+	}
+	return json.MarshalEncode(enc, x.l)
+}
+
+// UnmarshalJSON decodes data as encoding/json/v2 decodes a value of labels, and
 // keeps the value only if the validate method of Labels accepts it. JSON null,
 // like an error, leaves x as it was.
 func (x *Labels) UnmarshalJSON(data []byte) error {
@@ -644,6 +837,24 @@ func (x *Labels) UnmarshalJSON(data []byte) error {
 	}
 	var v labels
 	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	y, err := NewLabels(v)
+	if err != nil {
+		return err
+	}
+	*x = y
+	return nil
+}
+
+// UnmarshalJSONFrom decodes a value of labels from dec as UnmarshalJSON does,
+// with the options of dec.
+func (x *Labels) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if dec.PeekKind() == jsontext.KindNull {
+		return dec.SkipValue()
+	}
+	var v labels
+	if err := json.UnmarshalDecode(dec, &v); err != nil {
 		return err
 	}
 	y, err := NewLabels(v)
@@ -683,8 +894,8 @@ func (x Address) String() string {
 	return fmt.Sprint(x.a)
 }
 
-// MarshalJSON encodes the address that x holds as encoding/json encodes it, if
-// the validate method of Address accepts it, so that UnmarshalJSON reads it
+// MarshalJSON encodes the address that x holds as encoding/json/v2 encodes it,
+// if the validate method of Address accepts it, so that UnmarshalJSON reads it
 // back: the zero Address is made without it.
 func (x Address) MarshalJSON() ([]byte, error) {
 	if err := x.validate(x.a); err != nil {
@@ -693,15 +904,42 @@ func (x Address) MarshalJSON() ([]byte, error) {
 	return json.Marshal(x.a)
 }
 
-// UnmarshalJSON decodes data as encoding/json decodes a value of address, and
-// keeps the value only if the validate method of Address accepts it. JSON null,
-// like an error, leaves x as it was.
+// MarshalJSONTo encodes the address that x holds to enc as MarshalJSON does,
+// with the options of enc, so that x is written as its address would be.
+func (x Address) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if err := x.validate(x.a); err != nil {
+		return err
+	}
+	return json.MarshalEncode(enc, x.a)
+}
+
+// UnmarshalJSON decodes data as encoding/json/v2 decodes a value of address,
+// and keeps the value only if the validate method of Address accepts it. JSON
+// null, like an error, leaves x as it was.
 func (x *Address) UnmarshalJSON(data []byte) error {
 	if string(data) == "null" {
 		return nil
 	}
 	var v address
 	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	y, err := NewAddress(v)
+	if err != nil {
+		return err
+	}
+	*x = y
+	return nil
+}
+
+// UnmarshalJSONFrom decodes a value of address from dec as UnmarshalJSON does,
+// with the options of dec.
+func (x *Address) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if dec.PeekKind() == jsontext.KindNull {
+		return dec.SkipValue()
+	}
+	var v address
+	if err := json.UnmarshalDecode(dec, &v); err != nil {
 		return err
 	}
 	y, err := NewAddress(v)
@@ -766,6 +1004,18 @@ func (x Status) MarshalJSON() ([]byte, error) {
 	return json.Marshal(string(x))
 }
 
+// MarshalJSONTo encodes the underlying string of x to enc as MarshalJSON does,
+// with the options of enc.
+func (x Status) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if err := x.Validate(); err != nil {
+		if x == "" {
+			return fmt.Errorf("emit: cannot write the zero Status, which its rule rejects; set it, or, where a value may be absent, use a *Status or tag the field omitzero: %w", err)
+		}
+		return err
+	}
+	return json.MarshalEncode(enc, string(x))
+}
+
 // UnmarshalJSON decodes a JSON string, and sets x to it if NewStatus accepts
 // it. JSON null, like an error, leaves x as it was.
 func (x *Status) UnmarshalJSON(data []byte) error {
@@ -774,6 +1024,24 @@ func (x *Status) UnmarshalJSON(data []byte) error {
 	}
 	var v string
 	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	y, err := NewStatus(v)
+	if err != nil {
+		return err
+	}
+	*x = y
+	return nil
+}
+
+// UnmarshalJSONFrom decodes a JSON string from dec as UnmarshalJSON does, with
+// the options of dec.
+func (x *Status) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if dec.PeekKind() == jsontext.KindNull {
+		return dec.SkipValue()
+	}
+	var v string
+	if err := json.UnmarshalDecode(dec, &v); err != nil {
 		return err
 	}
 	y, err := NewStatus(v)
@@ -876,6 +1144,18 @@ func (x kind) MarshalJSON() ([]byte, error) {
 	return json.Marshal(string(x))
 }
 
+// MarshalJSONTo encodes the underlying string of x to enc as MarshalJSON does,
+// with the options of enc.
+func (x kind) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if err := x.Validate(); err != nil {
+		if x == "" {
+			return fmt.Errorf("emit: cannot write the zero kind, which its rule rejects; set it, or, where a value may be absent, use a *kind or tag the field omitzero: %w", err)
+		}
+		return err
+	}
+	return json.MarshalEncode(enc, string(x))
+}
+
 // UnmarshalJSON decodes a JSON string, and sets x to it if newKind accepts it.
 // JSON null, like an error, leaves x as it was.
 func (x *kind) UnmarshalJSON(data []byte) error {
@@ -884,6 +1164,24 @@ func (x *kind) UnmarshalJSON(data []byte) error {
 	}
 	var v string
 	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	y, err := newKind(v)
+	if err != nil {
+		return err
+	}
+	*x = y
+	return nil
+}
+
+// UnmarshalJSONFrom decodes a JSON string from dec as UnmarshalJSON does, with
+// the options of dec.
+func (x *kind) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if dec.PeekKind() == jsontext.KindNull {
+		return dec.SkipValue()
+	}
+	var v string
+	if err := json.UnmarshalDecode(dec, &v); err != nil {
 		return err
 	}
 	y, err := newKind(v)
