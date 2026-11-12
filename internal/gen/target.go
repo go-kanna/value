@@ -57,6 +57,9 @@ type target struct {
 	bytes bool
 }
 
+// jsonMethods are the methods generated on every value type, whatever it holds.
+var jsonMethods = []string{"MarshalJSON", "MarshalJSONTo", "UnmarshalJSON", "UnmarshalJSONFrom"}
+
 // zeroTest is how the generated IsZero tells the zero value.
 type zeroTest int
 
@@ -218,7 +221,7 @@ func accessorOf(s scan.Struct, f scan.Field) (string, []diag.Diag) {
 // generatedMethods returns the methods generated on a struct holding a value
 // of type t, besides the accessor.
 func generatedMethods(t types.Type) []string {
-	methods := []string{"MarshalJSON", "MarshalJSONTo", "UnmarshalJSON", "UnmarshalJSONFrom"}
+	methods := slices.Clone(jsonMethods)
 	if sqlConverts(t) {
 		methods = append(methods, "Value", "Scan")
 	}

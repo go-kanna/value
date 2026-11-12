@@ -67,3 +67,39 @@ func TestDeps_NothingMarked(t *testing.T) {
 		t.Errorf("Writes = %q, want none", r.Writes)
 	}
 }
+
+// Before another generator writes the types a value type holds, the run is
+// still known to write beside the declarations, and the names they fix.
+func TestDeps_Unresolved(t *testing.T) {
+	t.Parallel()
+
+	dir := writeModule(t, map[string]string{
+		"p/p.go": "package p\n\n//kanna:value\ntype Email struct{ v Address }\n\n" +
+			"func (Email) validate(Address) error { return nil }\n\n//kanna:enum\ntype Color Code\n\n" +
+			"const ColorRed Color = \"red\"\n",
+	})
+
+	code, stdout, stderr := run(t, filepath.Join(dir, "p"), "-deps")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	var r deps.Report
+	if err := json.Unmarshal([]byte(stdout), &r); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(r.Writes) != 1 || !strings.HasSuffix(r.Writes[0], filepath.Join("p", "value_gen.go")) {
+		t.Errorf("Writes = %q", r.Writes)
+	}
+	for _, name := range []string{
+		"example.com/app/p.NewEmail", "example.com/app/p.MustEmail", "example.com/app/p.Email.MarshalJSON",
+		"example.com/app/p.NewColor", "example.com/app/p.ColorValues", "example.com/app/p.Color.Validate",
+	} {
+		if !slices.Contains(r.Declares, name) {
+			t.Errorf("Declares = %q, want %s among them", r.Declares, name)
+		}
+	}
+	if slices.Contains(r.Declares, "example.com/app/p.Email.String") {
+		t.Errorf("Declares = %q, want no method that follows from the type held", r.Declares)
+	}
+}
