@@ -249,7 +249,7 @@ $ go generate ./...
   or, to name OrderStatusPaid otherwise, declare func OrderStatusSettled() OrderStatus instead
 ./order.go:13:2: error: OrderStatusNone holds "", the zero value of OrderStatus, which stands for none
   remove it, and use a *OrderStatus where a value may be absent
-./order.go:19:1: error: //kanna:value marks a struct type, not a type other than a struct or an interface, so nothing reads it
+./order.go:19:1: error: //kanna:value marks a struct type, not a string type, so nothing reads it
   write it right above a struct type
   or mark it //kanna:enum to accept only the constants declared beside it
 ```
