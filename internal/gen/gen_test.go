@@ -460,14 +460,14 @@ func TestCommand_RejectsAMisplacedDirective(t *testing.T) {
 		{
 			name: "//kanna:value on a string type",
 			src:  "//kanna:value\ntype Status string\n\nconst StatusA Status = \"a\"\n",
-			want: "./app.go:3:1: " + value + "a type other than a struct or an interface" + tail +
+			want: "./app.go:3:1: " + value + "a string type" + tail +
 				"  write it right above a struct type\n" +
 				"  or mark it //kanna:enum to accept only the constants declared beside it\n",
 		},
 		{
 			name: "//kanna:value on another type",
 			src:  "//kanna:value\ntype Price int\n",
-			want: "./app.go:3:1: " + value + "a type other than a struct or an interface" + tail +
+			want: "./app.go:3:1: " + value + "an int type" + tail +
 				"  write it right above a struct type\n",
 		},
 		{
