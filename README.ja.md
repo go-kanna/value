@@ -108,7 +108,7 @@ $ go generate ./...
 
 値オブジェクトを読み取る別のジェネレータのパッケージ（kanna-mapper のパッケージなど）には、その `value_gen.go` が存在している必要があります。そのため初回の実行では、値オブジェクトのパッケージを先に生成してください。
 
-kanna の生成器を 2 つ以上使うときは、必要な順に実行する [`go tool kanna gen`](https://github.com/go-kanna/kanna) を使ってください。
+kanna のジェネレータを 2 つ以上使うときは、必要な順に実行する [`go tool kanna gen`](https://github.com/go-kanna/kanna) を使ってください。
 
 ## 生成されるもの
 
@@ -184,7 +184,7 @@ func (x OrderStatus) Validate() error                  // whether x is the value
 
 型は定数を持つ string 型のままなので、定数に対する `switch`、switch の網羅性を調べる linter、定数を読み取る他のジェネレータは、これまでどおり動きます。プログラム内では、他の string 型と同じく `OrderStatus("shiped")` もコンパイルが通るので、値は定数か `NewOrderStatus` で作ってください。そのどちらからも作られなかった値は `Validate` で検出でき、値を書き出すメソッドも同じく拒否するので、書き出したものは読み戻せます。ゼロ値も定数ではないので、書き出すと、設定し忘れたフィールドのようにゼロ値であることを示すエラーで止まります。値がない場合があるなら、JSON の null と SQL の NULL で nil のままになる `*OrderStatus` を使うか、`json:",omitzero"` タグを付けてください。`"shiped"` のような定数は、[`kanna-value vet`](#enum-に渡す定数を検査する) がプログラムを動かす前に見つけます。
 
-定数 1 つが enum の値 1 つで、enum を読む生成器はそれを 1 つずつ扱います。そのため、同じ値を持つ 2 つの定数は、コピーの誤りと同じく生成を止めます。既定値のように、ある値に別の名前を付けたいときは、関数で書きます:
+定数 1 つが enum の値 1 つで、enum を読むジェネレータはそれを 1 つずつ扱います。そのため、同じ値を持つ 2 つの定数は、コピーの誤りと同じく生成を止めます。既定値のように、ある値に別の名前を付けたいときは、関数で書きます:
 
 ```go
 func DefaultOrderStatus() OrderStatus { return OrderStatusPlaced }
