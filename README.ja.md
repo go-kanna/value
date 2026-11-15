@@ -75,7 +75,7 @@ func (x CompletedAt) Equal(y CompletedAt) bool
 // String, IsZero, the JSON methods, Value, and Scan, as for Email
 ```
 
-フィールドは非公開なので、パッケージの外で値を得る手段は `NewEmail`、`MustEmail`、`UnmarshalJSON`、`UnmarshalJSONFrom`、`Scan` だけで、どれも `validate` を実行します。`Email` を受け取るコードは、もう一度チェックする必要がありません。ただし、`var e Email` のように Go が `validate` を通さずに作るゼロ値は例外です。ゼロ値は `IsZero` で分かります。値を書き出すメソッドも `validate` を実行するので、ルールが拒否するゼロ値は、読み戻せずに失敗するのではなく、書き出す時点で、設定し忘れたフィールドのようにゼロ値だと言うエラーで止まります。値がないことのあるフィールドは、JSON の null と SQL の NULL で nil のままになるポインタ `*Email` にするか、`json:",omitzero"` タグを付けます。
+フィールドは非公開なので、パッケージの外で値を得る手段は `NewEmail`、`MustEmail`、`UnmarshalJSON`、`UnmarshalJSONFrom`、`Scan` だけで、どれも `validate` を実行します。`Email` を受け取るコードは、もう一度チェックする必要がありません。ただし、`var e Email` のように Go が `validate` を通さずに作るゼロ値は例外です。ゼロ値は `IsZero` で分かります。値を書き出すメソッドも `validate` を実行するので、ルールが拒否するゼロ値は、読み戻せずに失敗するのではなく、書き出す時点で、設定し忘れたフィールドのようにゼロ値であることを示すエラーで止まります。値がないことのあるフィールドは、JSON の null と SQL の NULL で nil のままになるポインタ `*Email` にするか、`json:",omitzero"` タグを付けます。
 
 JSON のメソッドは encoding/json/v2 を使います。encoding/json/v2 も encoding/json も `MarshalJSONTo` と `UnmarshalJSONFrom` を先に呼び、この 2 つは呼び出しのオプションを値に引き継ぎます。そのため `Email` は、同じ呼び出しでその文字列を書くのと同じ形で出力されます。`<` をエスケープするかどうかも、不正な UTF-8 を置き換えるか拒否するかも、文字列と同じです。`MarshalJSON` と `UnmarshalJSON` は、直接呼ぶコードのために残してあり、encoding/json/v2 の既定のオプションを使います。
 
@@ -108,7 +108,7 @@ $ go generate ./...
 
 値オブジェクトを読み取る別のジェネレータのパッケージ（kanna-mapper のパッケージなど）には、その `value_gen.go` が存在している必要があります。そのため初回の実行では、値オブジェクトのパッケージを先に生成してください。
 
-kanna の生成器を 2 つ以上使うなら、必要な順に動かす [`go tool kanna gen`](https://github.com/go-kanna/kanna) で動かしてください。
+kanna の生成器を 2 つ以上使うときは、必要な順に実行する [`go tool kanna gen`](https://github.com/go-kanna/kanna) を使ってください。
 
 ## 生成されるもの
 
@@ -132,9 +132,9 @@ kanna の生成器を 2 つ以上使うなら、必要な順に動かす [`go to
 
 - `T` は基本型か名前付き型で、その名前からアクセサの名前が決まります。スライスは `type tags []string` のように独自の型を通して保持します。
 - 金額と通貨のように複数の値を持つときは、それらを 1 つの構造体にまとめて保持します。`type Amount struct{ Units int64; Currency string }` を `type Money struct{ a Amount }` で保持すると、アクセサは `Amount` です。ほかのパッケージから `NewMoney` を呼べるように、構造体は公開します。非公開の型の値は、パッケージの外では書けないからです。
-- `T` は、名前の有無によらず、ポインタ、チャネル、関数にはできません。参照する先を値を作った側と共有し、`validate` のあとで書き換えられるからです。ポインタは、`*url.URL` ではなく `url.URL` のように、指す先を保持します。
+- `T` は、名前の有無によらず、ポインタ、チャネル、関数にはできません。参照先を値を作った側と共有することになり、その側が `validate` のあとで書き換えられるからです。ポインタは、`*url.URL` ではなく `url.URL` のように、指す先を保持します。
 - スライスとマップは、受け取るときと返すときに `slices.Clone` または `maps.Clone` でコピーされるので、`validate` を通った後に変更されることはありません。ただし、要素の中身まではコピーされず、構造体の中のスライスもコピーされません。その場で変更されない値を保持してください。
-- `IsZero` は Go と同じ基準でゼロ値を判定します。nil スライスはゼロ値ですが、空のスライスは違います。`==` でも `== nil` でも独自のメソッドでもゼロ値を判定できない `T`（スライスを持つ構造体など）には `IsZero` が生成されず、encoding/json の `omitzero` はリフレクションにフォールバックします。
+- `IsZero` は Go と同じ基準でゼロ値を判定します。nil スライスはゼロ値ですが、空のスライスはゼロ値ではありません。`==` でも `== nil` でも独自のメソッドでもゼロ値を判定できない `T`（スライスを持つ構造体など）には `IsZero` が生成されず、encoding/json の `omitzero` はリフレクションにフォールバックします。
 - ゼロを渡すことと何も渡さないことは区別されません。価格の 0 のようにルールがゼロ値を受け入れる場合、`MustPrice(0)` は `Price{}` と等しく、`IsZero` はどちらもゼロと判定し、`omitzero` はどちらも省略し、kanna-validator の `required` はどちらも `blank` と報告します。ゼロという値と値がないことを区別したい場合は、`*Price` で保持し、値がないときは nil にしてください。
 - `Equal` があるのは、時刻では `==` が正しく判定できないことがあるからです。同じ時刻でも、片方がモノトニッククロックの読み取り値を持っていたり、ロケーションが異なっていたりすると `==` では異なるものになります。データベースから読み戻した時刻がこれにあたります。
 - database/sql が `T` を両方向に変換できるのは、`T` が bool、複素数以外の数値、文字列、`[]byte`、`time.Time`、`uuid.UUID` の場合と、`T` の値が `Value() (driver.Value, error)` を、ポインタが `Scan(any) error` を持つ場合です。`type tags []string` のようなそれ以外の `T` には、`Value` と `Scan` を生成しません。生成しても、どの値でも失敗するからです。保存したい場合は、自分で書いてください。nil の `[]byte` は空として書き出します。database/sql は NULL として書き、`Scan` が拒否するからです。
@@ -182,7 +182,7 @@ func (x OrderStatus) Validate() error                  // whether x is the value
 
 コンストラクタと、デコード、スキャン、エンコード、書き出し、検証のメソッドは、どの定数でもない値を `rule.Fail("inclusion")` で拒否します（kanna-validator の `oneof` が報告するのと同じコード）。デコードとスキャンは、エラーの場合も JSON の null の場合も、値を変更しません。NULL のカラムは、値オブジェクトと同じくエラーになります。
 
-型は定数を持つ string 型のままなので、定数に対する `switch`、switch の網羅性を調べる linter、定数を読み取る他のジェネレータは、これまでどおり動きます。プログラム内では、他の string 型と同じく `OrderStatus("shiped")` もコンパイルが通るので、値は定数か `NewOrderStatus` で作ってください。そのどちらからも作られなかった値は `Validate` で検出でき、値を書き出すメソッドも同じく拒否するので、書き出したものは読み戻せます。ゼロ値も定数ではないので、書き出すと、設定し忘れたフィールドのようにゼロ値だと言うエラーで止まります。値がない場合があるなら、JSON の null と SQL の NULL で nil のままになる `*OrderStatus` を使うか、`json:",omitzero"` タグを付けてください。`"shiped"` のような定数は、[`kanna-value vet`](#enum-に渡す定数を検査する) がプログラムを動かす前に見つけます。
+型は定数を持つ string 型のままなので、定数に対する `switch`、switch の網羅性を調べる linter、定数を読み取る他のジェネレータは、これまでどおり動きます。プログラム内では、他の string 型と同じく `OrderStatus("shiped")` もコンパイルが通るので、値は定数か `NewOrderStatus` で作ってください。そのどちらからも作られなかった値は `Validate` で検出でき、値を書き出すメソッドも同じく拒否するので、書き出したものは読み戻せます。ゼロ値も定数ではないので、書き出すと、設定し忘れたフィールドのようにゼロ値であることを示すエラーで止まります。値がない場合があるなら、JSON の null と SQL の NULL で nil のままになる `*OrderStatus` を使うか、`json:",omitzero"` タグを付けてください。`"shiped"` のような定数は、[`kanna-value vet`](#enum-に渡す定数を検査する) がプログラムを動かす前に見つけます。
 
 定数 1 つが enum の値 1 つで、enum を読む生成器はそれを 1 つずつ扱います。そのため、同じ値を持つ 2 つの定数は、コピーの誤りと同じく生成を止めます。既定値のように、ある値に別の名前を付けたいときは、関数で書きます:
 
