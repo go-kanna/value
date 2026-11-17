@@ -6,7 +6,7 @@ toolchain go1.27.3
 
 tool github.com/go-kanna/value/cmd/kanna-value
 
-require github.com/go-kanna/value v0.0.18
+require github.com/go-kanna/value v0.1.0
 
 require (
 	github.com/go-kanna/internal v0.1.0 // indirect
